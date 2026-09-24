@@ -1,20 +1,83 @@
-# Pot generator settings. Override anything on the command line, e.g.
-#   python make_pot.py height=65 quality=draft pattern=coral design.wall=4
+# =====================================================================
+# Plant pot generator settings (read by make_pot.py through Hydra).
+#
+# Every value here is a default: override any of them on the command
+# line with key=value, no need to edit this file.
+#   python make_pot.py height=65 quality=draft
+#   python make_pot.py pattern=coral design.wall=4
+#   python make_pot.py --show          # print the final settings, no build
+# See README.md for the full description of each parameter.
+# =====================================================================
+
 defaults:
+  # Mesh quality preset: `full` or `draft` (files in conf/quality/).
   - quality: full
   - _self_
 
-pattern: voronoi_taper   # gyroid, diamond, voronoi, voronoi_taper, hex, coral, slots
-height: 50              # mm; radii, cup and cells-around scale with it (130 = reference shape)
-preview: true            # also render the PNG preview
-out: output/${pattern}_h${height}   # config.yaml with these settings is saved here too
+# ---------------------------------------------------------------------
+# pattern: the perforation/lattice used for the pot wall.
+#   voronoi_taper  organic cells that flare outward like funnels: small
+#                  holes on the soil side, big ones outside (default,
+#                  best air/soil balance). Strut widths: design.strut_*.
+#   voronoi        same organic cells, straight holes (1.8 mm struts).
+#   hex            warped honeycomb, pointy-top cells (1.8 mm struts).
+#   coral          reaction-diffusion (Turing) labyrinth. First run at a
+#                  new height is slow (texture is generated, then cached).
+#   slots          narrow wavy vertical slots, air-pruning style.
+#   gyroid         3D lattice, no straight line of sight through the wall.
+#   diamond        3D lattice, straighter 45-degree channels.
+# ---------------------------------------------------------------------
+pattern: voronoi_taper
 
-# Print-physics sizes in mm. These do NOT scale with height.
+# ---------------------------------------------------------------------
+# height (mm): overall pot height. Drives the whole shape: the radii,
+# the cup height, the moat gap and the number of cells around the pot
+# all scale by height / 130, so the proportions stay the same.
+#   130 -> reference pot, 151 mm wide (outer radius 56 -> 72 mm)
+#    65 -> half size, about 78 mm wide
+# The `design` sizes below and the hole size do NOT scale.
+# Minimum: base + rim + 10 mm (17.4 mm with the defaults).
+# ---------------------------------------------------------------------
+height: 50
+
+# preview: also render a PNG (outside view, cut-away, vertical section,
+# and both wall faces at true scale with their open %). Costs ~10 s.
+preview: true
+
+# out: output folder. It gets the .stl, the .3mf, the .png and a
+# config.yaml with the exact settings used. ${pattern} and ${height} are
+# filled in automatically; an existing folder is overwritten.
+out: output/${pattern}_h${height}
+
+# ---------------------------------------------------------------------
+# design: print-physics sizes in mm. They stay the same at every height
+# because they depend on the printer (nozzle, layer bridging) and on the
+# soil, not on how big the pot is.
+# ---------------------------------------------------------------------
 design:
-  wall: 6.0              # pot wall thickness
-  rim: 5.0               # solid band at the top
-  base: 2.4              # solid floor shared by pot and cup
-  cup_wall: 2.4
-  strut_in: 2.2          # voronoi_taper strut width, soil side
-  strut_out: 1.1         # voronoi_taper strut width, outside (>= ~1.1 for a 0.4 nozzle)
+  # Pot wall thickness, measured radially. The pattern goes through it.
+  # Thicker = stiffer and longer funnels; thinner = lighter, more open
+  # looking. Small pots look chunky at 6 mm; 4 mm is fine there.
+  wall: 4.0
 
+  # Solid band at the top of the pot (no holes). Gives the rim its
+  # stiffness and a clean edge to hold.
+  rim: 5.0
+
+  # Solid floor shared by the pot and the cup. The soil sits directly on
+  # it and wicks water from the cup. The pattern starts 1 mm above it.
+  base: 2.4
+
+  # Wall thickness of the plain drip cup around the bottom.
+  cup_wall: 2.4
+
+  # voronoi_taper only. Strut width on the soil side (inner face). The
+  # struts thin linearly to strut_out on the outside, so every hole is a
+  # funnel. Wider = smaller holes on the soil side = less soil loss,
+  # less air. 2.2 gives ~29% open with ~2.5 mm holes inside.
+  strut_in: 2.2
+
+  # voronoi_taper only. Strut width on the outer face. Keep it >= ~1.1 mm
+  # (the minimum a 0.4 mm nozzle prints reliably) and <= strut_in (so
+  # holes widen outward). 1.1 gives ~58% open with ~3.6 mm holes outside.
+  strut_out: 1.1

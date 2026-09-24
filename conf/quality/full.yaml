@@ -1,2 +1,11 @@
-voxel: 0.3       # mesh resolution in mm; ~2-3 min and 2-3 GB RAM at 130 mm
-faces: 900000    # triangle budget of the final mesh
+# Final print quality. Select with quality=full (the default).
+
+# voxel (mm): grid spacing of the marching-cubes mesh. Smaller = finer
+# detail, but time and memory grow ~1/voxel^3. At 0.3 mm a 130 mm pot
+# takes ~2-3 min and 2-3 GB RAM (a 65 mm pot about 1/8 of that).
+# Don't run several full builds in parallel.
+voxel: 0.3
+
+# faces: triangle budget of the final mesh (it is decimated down to
+# this). 900k keeps the struts crisp; lower it for smaller files.
+faces: 900000
