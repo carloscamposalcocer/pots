@@ -1,0 +1,9 @@
+numpy
+scipy
+scikit-image
+trimesh
+matplotlib
+fast-simplification
+pymeshfix
+lxml
+networkx
