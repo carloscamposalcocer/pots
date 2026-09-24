@@ -14,7 +14,7 @@ import logging
 import sys
 import numpy as np
 import pot_v2 as P2
-from pot_v2 import WALL, RIM, T_IN, T_OUT, BLEND, r_out, r_in, smin, gyroid, build
+from pot_v2 import T_IN, T_OUT, BLEND, r_out, r_in, smin, gyroid, build
 
 BASE = 2.4            # shared solid floor
 CUP_H_REF = 28.0      # cup height at P2.H_REF, measured from the build plate
@@ -48,9 +48,9 @@ def field(X, Y, Z):
 
     # lattice pot wall, standing on the base, up to the solid rim
     shell = np.maximum.reduce([r - ro, ri - r, -Z, Z - P2.H])
-    s = np.clip((r - ri) / WALL, 0, 1)
+    s = np.clip((r - ri) / P2.WALL, 0, 1)
     dg = gyroid(th, Z, r, T_IN + (T_OUT - T_IN) * s)
-    rim = (P2.H - RIM) - Z
+    rim = (P2.H - P2.RIM) - Z
     wall = np.maximum(shell, smin(dg, rim, BLEND))
 
     # plain cup wall + shared solid base

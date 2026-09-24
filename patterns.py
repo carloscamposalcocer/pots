@@ -18,7 +18,7 @@ import numpy as np
 from scipy import ndimage
 
 import pot_v2 as P2
-from pot_v2 import WALL, RIM, CELL, T_IN, T_OUT, BLEND, r_out, r_in, smin, gyroid, build
+from pot_v2 import CELL, T_IN, T_OUT, BLEND, r_out, r_in, smin, gyroid, build
 import pot_v3 as P3
 
 log = logging.getLogger(__name__)
@@ -234,9 +234,9 @@ def make_field(name):
         th = np.arctan2(Y, X)
         ro, ri = r_out(Z), r_in(Z)
         shell = np.maximum.reduce([r - ro, ri - r, -Z, Z - P2.H])
-        s = np.clip((r - ri) / WALL, 0, 1)
+        s = np.clip((r - ri) / P2.WALL, 0, 1)
         band_lo = Z - (P3.BASE + 1.0)            # pattern starts just above the base
-        band_hi = (P2.H - RIM) - Z
+        band_hi = (P2.H - P2.RIM) - Z
         band = np.minimum(band_lo, band_hi)       # >0 inside the pattern band
         if kind == "3d":
             mat = smin(fn(th, Z, r, s), band, BLEND)      # solid outside the band

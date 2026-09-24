@@ -7,3 +7,4 @@ fast-simplification
 pymeshfix
 lxml
 networkx
+hydra-core

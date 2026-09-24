@@ -1,0 +1,2 @@
+voxel: 0.3       # mesh resolution in mm; ~2-3 min and 2-3 GB RAM at 130 mm
+faces: 900000    # triangle budget of the final mesh

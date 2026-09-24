@@ -1,32 +1,36 @@
 """
 Generate the pot: STL + 3MF + preview image, in one command.
 
-Needs pot_v2.py, pot_v3.py and patterns.py in the same folder.
+Needs pot_v2.py, pot_v3.py, patterns.py and the conf/ folder (Hydra config).
+Every setting has a default in conf/config.yaml; pass only what you change.
 
 Examples
-    python make_pot.py                          # tapered Voronoi, full quality
-    python make_pot.py --pattern coral          # another pattern
-    python make_pot.py --draft                  # fast low-res test (~15 s)
-    python make_pot.py --height 65              # half-size pot, same shape
-    python make_pot.py --list                   # show available patterns
+    python make_pot.py                          # tapered Voronoi, 130 mm, full quality
+    python make_pot.py quality=draft            # fast low-res test
+    python make_pot.py height=65                # half-size pot, same shape
+    python make_pot.py pattern=coral            # another pattern
+    python make_pot.py design.wall=4            # thinner wall (mm, does not scale)
+    python make_pot.py height=65 --show         # print the resolved settings, don't build
     python make_pot.py -v                       # debug: per-slab marching cubes
 
-Outputs (in --out, default ./output):
+Outputs (in `out`, default output/<pattern>_h<height>/):
     pot_<pattern>.stl      print file
     pot_<pattern>.3mf      same mesh, ~5x smaller file
     pot_<pattern>.png      preview: outside view, cut-away, wall faces
+    config.yaml            the exact settings used (re-run: copy values back as overrides)
 """
-import argparse
 import logging
 import os
 import sys
 import time
 
+import hydra
 import numpy as np
 import trimesh
+from omegaconf import OmegaConf
 
 import patterns
-from patterns import PATTERNS, make_field, build, r_out, WALL, P2, P3
+from patterns import PATTERNS, make_field, build, r_out, P2, P3
 
 log = logging.getLogger("pots")
 
@@ -103,7 +107,7 @@ def preview(mesh, field, path, title):
     zc = np.arange(z0, z0 + wz, 0.1); ang = np.arange(0, ww, 0.1)
     A, Zg = np.meshgrid(ang, zc); TH = A / r_out(Zg)
     for k, (frac, lab) in enumerate(((0.02, "Outside face"), (0.98, "Soil-side face"))):
-        R = r_out(Zg) - WALL * frac
+        R = r_out(Zg) - P2.WALL * frac
         open_ = field((R * np.cos(TH)).astype(np.float32), (R * np.sin(TH)).astype(np.float32),
                       Zg.astype(np.float32)) >= 0
         img = np.ones(open_.shape + (3,)); img[~open_] = [0.26, 0.45, 0.32]
@@ -115,50 +119,70 @@ def preview(mesh, field, path, title):
     log.info("preview saved %s in %.1f s", path, time.perf_counter() - t0)
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--pattern", default="voronoi_taper", choices=sorted(PATTERNS))
-    ap.add_argument("--height", type=float, default=P2.H_REF,
-                    help=f"pot height in mm (default {P2.H_REF:g}); radii and cup scale with it, "
-                         "wall/rim/base/struts/hole size stay fixed")
-    ap.add_argument("--voxel", type=float, default=0.3, help="mesh resolution in mm (smaller = finer, slower)")
-    ap.add_argument("--faces", type=int, default=900_000, help="triangle budget of the final mesh")
-    ap.add_argument("--draft", action="store_true", help="quick low-res run (voxel 0.6, 300k faces)")
-    ap.add_argument("--no-preview", action="store_true")
-    ap.add_argument("--out", default="output")
-    ap.add_argument("--list", action="store_true")
-    ap.add_argument("-v", "--verbose", action="store_true", help="debug logging (per-slab marching cubes, etc.)")
-    a = ap.parse_args()
+def apply_config(cfg):
+    """Push the config into the geometry modules; returns an error message or None."""
+    if cfg.pattern not in PATTERNS:
+        return f"unknown pattern '{cfg.pattern}'; choose from: {', '.join(sorted(PATTERNS))}"
+    d = cfg.design
+    P2.WALL, P2.RIM = float(d.wall), float(d.rim)
+    P3.BASE, P3.CUP_WALL = float(d.base), float(d.cup_wall)
+    patterns.STRUT_IN, patterns.STRUT_OUT = float(d.strut_in), float(d.strut_out)
+    min_h = P3.BASE + P2.RIM + 10.0
+    if cfg.height < min_h:
+        return f"height must be at least {min_h:g} mm (base + rim + some pattern)"
+    if d.strut_out < 1.1:
+        log.warning("design.strut_out=%.2f mm is below ~1.1 mm, too thin for a 0.4 mm nozzle", d.strut_out)
+    patterns.set_height(cfg.height)
+    return None
+
+
+def load_config(overrides):
+    # Compose API instead of @hydra.main: hydra-core 1.3's own argparse CLI
+    # crashes on Python 3.14. Overrides use the same key=value syntax.
+    with hydra.initialize(config_path="conf", version_base="1.3"):
+        return hydra.compose("config", overrides=overrides)
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if {"-h", "--help"} & set(argv):
+        print(__doc__); return
+    flags = {a for a in argv if a.startswith("-")}
+    unknown = flags - {"-v", "--verbose", "--show"}
+    if unknown:
+        raise SystemExit(f"unknown option(s): {' '.join(sorted(unknown))}  (settings are key=value, see --help)")
+    try:
+        cfg = load_config([a for a in argv if not a.startswith("-")])
+    except hydra.errors.HydraException as e:
+        raise SystemExit(f"bad setting: {e}".splitlines()[0] + "  (see --show for valid keys)")
+    if "--show" in flags:
+        print(OmegaConf.to_yaml(cfg, resolve=True), end=""); return
     logging.basicConfig(
-        level=logging.DEBUG if a.verbose else logging.INFO,
+        level=logging.DEBUG if flags & {"-v", "--verbose"} else logging.INFO,
         format="%(asctime)s  %(levelname)-5s  %(message)s",
         datefmt="%H:%M:%S",
         stream=sys.stderr,
     )
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
     logging.getLogger("trimesh").setLevel(logging.WARNING)
-    if a.list:
-        print("\n".join(sorted(PATTERNS))); return
-    if a.draft:
-        a.voxel, a.faces = 0.6, 300_000
-        log.info("draft mode: voxel=%.2f mm, face budget=%s", a.voxel, f"{a.faces:,}")
+    err = apply_config(cfg)
+    if err:
+        log.error(err)
+        raise SystemExit(2)
+    q = cfg.quality
+    log.info("height %.1f mm (x%.3f): radius %.1f -> %.1f mm, cup %.1f mm tall, wall %.1f mm",
+             P2.H, P2.K, P2.R_BOT, P2.R_TOP, P3.CUP_H, P2.WALL)
 
-    min_h = P3.BASE + P2.RIM + 10.0
-    if a.height < min_h:
-        ap.error(f"--height must be at least {min_h:g} mm (base + rim + some pattern)")
-    patterns.set_height(a.height)
-    log.info("height %.1f mm (x%.3f): radius %.1f -> %.1f mm, cup %.1f mm tall",
-             P2.H, P2.K, P2.R_BOT, P2.R_TOP, P3.CUP_H)
-
-    os.makedirs(a.out, exist_ok=True)
-    base = os.path.join(a.out, f"pot_{a.pattern}")
-    field = make_field(a.pattern)
+    os.makedirs(cfg.out, exist_ok=True)
+    OmegaConf.save(cfg, os.path.join(cfg.out, "config.yaml"), resolve=True)
+    base = os.path.join(cfg.out, f"pot_{cfg.pattern}")
+    field = make_field(cfg.pattern)
     t = time.perf_counter()
-    log.info("[1/3] meshing '%s' at %.3f mm", a.pattern, a.voxel)
-    raw = build(field, P2.R_TOP + P3.LIP + P3.CUP_WALL + 1.0, P2.H, a.voxel, base + "_raw.stl")
+    log.info("[1/3] meshing '%s' at %.3f mm", cfg.pattern, q.voxel)
+    raw = build(field, P2.R_TOP + P3.LIP + P3.CUP_WALL + 1.0, P2.H, q.voxel, base + "_raw.stl")
     os.remove(base + "_raw.stl")
     log.info("[2/3] cleaning %s faces", f"{len(raw.faces):,}")
-    m = clean(raw, a.faces)
+    m = clean(raw, q.faces)
     size = np.ptp(m.bounds, axis=0)
     log.info(
         "mesh  faces=%s  watertight=%s  size=%.1f x %.1f x %.1f mm  volume=%.0f cm3",
@@ -166,14 +190,13 @@ def main():
     )
     log.info("exporting %s.stl and %s.3mf", base, base)
     m.export(base + ".stl"); m.export(base + ".3mf")
-    if not a.no_preview:
+    outs = [f"{base}.stl", f"{base}.3mf"]
+    if cfg.preview:
         log.info("[3/3] rendering preview")
-        preview(m, field, base + ".png", f"pot_{a.pattern}")
+        preview(m, field, base + ".png", f"pot_{cfg.pattern}  (H {P2.H:g} mm)")
+        outs.append(f"{base}.png")
     else:
         log.info("[3/3] skipped preview")
-    outs = [f"{base}.stl", f"{base}.3mf"]
-    if not a.no_preview:
-        outs.append(f"{base}.png")
     log.info("done in %.0f s -> %s", time.perf_counter() - t, "  ".join(outs))
 
 

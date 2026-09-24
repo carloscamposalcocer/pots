@@ -1,12 +1,18 @@
 # Plant Pot Project
 
-3D-printable plant pot, continued from an earlier Claude session. Read make_pot.py, patterns.py, pot_v3.py and pot_v2.py before changing anything. Use `python make_pot.py --draft` to confirm everything works in the venv (deps are in requirements.txt).
+3D-printable plant pot, continued from an earlier Claude session. Read make_pot.py, patterns.py, pot_v3.py and pot_v2.py before changing anything. Use `.venv/Scripts/python.exe make_pot.py quality=draft` to confirm everything works (the system `python` lacks the deps; they are in requirements.txt / uv.lock).
+
+## Settings (Hydra)
+- User settings live in `conf/config.yaml` (+ `conf/quality/{full,draft}.yaml`): pattern, height, preview, out, quality (voxel, faces), design (wall, rim, base, cup_wall, strut_in, strut_out). Keep it to user-facing knobs; internal constants (cell counts, jitter, warps) stay in code.
+- Override as `key=value`: `make_pot.py height=65 quality=draft design.wall=4`. `--show` prints the resolved config, `-v` = debug logs. Each run saves the resolved `config.yaml` into its `out` dir.
+- make_pot.py uses Hydra's compose API, not `@hydra.main`: hydra-core 1.3.7 (latest stable) crashes in argparse on Python 3.14. `apply_config()` pushes the design values into the P2/P3/patterns module globals, then calls `patterns.set_height`.
 
 ## Goal
 A single-piece, support-free FDM plant pot. The wall should let in as much air as possible without losing soil. A plain cup is fused to the base to catch drips and act as the water reserve. The wall pattern should be semi-organic and repeat seamlessly.
 
 ## Current design (decided)
-- Overall size 151 x 130 mm. Pot body is tapered: outer radius 56 mm at the bottom, 72 mm at the top. Wall 6 mm thick, solid 5 mm rim at the top.
+- Size is driven by H (`make_pot.py height=65`; H_REF = 130 is the reference shape). `patterns.set_height(h)` (which chains to pot_v3/pot_v2 `set_height`) scales everything shape-related by k = H/130: radii, R0, cup height, moat gap, and the cell counts around the circumference (rounded to integers, so the pattern stays seamless and cells keep their mm size). Fixed in mm on purpose: wall, rim, base, cup wall, lip overhang, struts, VOR_H, hole size, blends, chamfer. Other modules must read sizes as `P2.H`, `P2.R_TOP`, ... at call time, never `from pot_v2 import H` (that copies a stale value).
+- Reference size 151 x 130 mm. Pot body is tapered: outer radius 56 mm at the bottom, 72 mm at the top. Wall 6 mm thick, solid 5 mm rim at the top.
 - Wall pattern: tapered Voronoi (`voronoi_taper` in patterns.py). The holes flare outward like funnels.
   - Struts are 2.2 mm on the soil side and thin to 1.1 mm outside (STRUT_IN, STRUT_OUT).
   - Result: outside face 58% open, typical hole 3.6 mm. Soil side 29% open, typical hole 2.5 mm.
