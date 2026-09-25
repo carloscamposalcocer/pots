@@ -17,6 +17,14 @@
 #   strut_out  tapered patterns: strut width on the outer face. Keep it
 #              >= ~1.1 (thinnest a 0.4 mm nozzle prints reliably) and
 #              <= strut_in so the holes widen outward like funnels.
+#   center     tapered patterns: 0 (default) keeps every hole roof where
+#              it is from the soil side out, so the holes grow only
+#              sideways and downward and each roof is a level bridge or a
+#              steady slope. 1 moves the soil-side pattern down so each
+#              hole is centred on its outside opening, growing evenly all
+#              round. In between = partly. Above 0 the roofs rise toward
+#              the outside: voronoi_taper and hex_taper have flat bridge
+#              roofs, which then become sloped ceilings that can sag.
 #
 # Not here on purpose: the 55-degree roof slope and the warp frequencies,
 # which keep the pot support-free and seamless.
@@ -30,6 +38,7 @@ patterns:
     warp: 1.2         # sideways wobble of the cells (amplitude)
     strut_in: 2.2     # 2.2 -> ~29% open, ~2.5 mm holes on the soil side
     strut_out: 1.1    # 1.1 -> ~58% open, ~3.6 mm holes outside
+    center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   voronoi:
     cells: 76
@@ -49,6 +58,7 @@ patterns:
     cells: 84
     strut_in: 2.2
     strut_out: 1.1
+    center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
     strut_extra: 0.2  # added to every strut: the warp shears the cells and thins some struts
     warp: 1.6
     warp_z: 1.0
@@ -58,6 +68,7 @@ patterns:
     row: 1.05         # row height, as a fraction of the cell width
     strut_in: 2.2
     strut_out: 1.1
+    center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   lattice:
     cells: 72         # 72 -> strips 4.6 mm apart
@@ -67,6 +78,7 @@ patterns:
     cells: 72
     strut_in: 3     # 2.2 -> ~27% open, ~2.3 mm holes on the soil side
     strut_out: 0.5    # 1.1 -> ~57% open, ~3.3 mm holes outside
+    center: 1       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   isogrid:
     cells: 54         # 54 -> ~7.4 mm triangle sides
@@ -116,5 +128,5 @@ patterns:
     level_out: 0.40
 
   weave:
-    cells: 56
-    width: 2.4        # ribbon width
+    cells: 60
+    width: 3.2        # ribbon width

@@ -67,6 +67,10 @@ def pot_from_config(cfg):
     return pot
 
 
+# tapered patterns whose hole roofs are flat bridges (the others have 55-degree roofs)
+BRIDGE_ROOFS = {"voronoi_taper", "hex_taper"}
+
+
 def check_pattern_params(cfg):
     """Warn about pattern settings that won't print well."""
     for name in (cfg.pattern, *PATTERNS[cfg.pattern].uses):
@@ -77,6 +81,12 @@ def check_pattern_params(cfg):
                             name, key, c[key])
         if "strut_in" in c and c.strut_out > c.strut_in:
             log.warning("patterns.%s.strut_out > strut_in: the holes will narrow outward", name)
+        if "center" in c:
+            if not 0 <= c.center <= 1:
+                raise ValueError(f"patterns.{name}.center must be between 0 and 1")
+            if c.center > 0 and name in BRIDGE_ROOFS:
+                log.warning("patterns.%s.center=%g: the flat hole roofs rise toward the outside "
+                            "and may sag (0 keeps them level)", name, c.center)
 
 
 def setup_logging(verbose):

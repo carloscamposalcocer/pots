@@ -114,6 +114,7 @@ Keys most patterns share:
 | `strut` | Straight-through patterns: strut width between holes (1.8 mm). |
 | `strut_in` | Tapered patterns (`voronoi_taper`, `hex_taper`, `drops`, `lattice_taper`): strut width on the soil side (2.2 mm). Wider = smaller inner holes = less soil loss, less air. |
 | `strut_out` | Tapered patterns: strut width on the outside (1.1 mm). Keep ≥ ~1.1 (0.4 mm nozzle) and ≤ `strut_in` so holes widen outward. |
+| `center` | Tapered patterns, 0 to 1 (default 0). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi_taper` and `hex_taper` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice_taper` have 55° roofs and barely change. |
 
 With the defaults, `voronoi_taper` is 58% open outside (typical hole
 3.6 mm) and 29% open on the soil side (typical hole 2.5 mm); `lattice_taper`

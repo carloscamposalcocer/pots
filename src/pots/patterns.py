@@ -60,6 +60,20 @@ def taper(c, s):
     return c.strut_in + (c.strut_out - c.strut_in) * s
 
 
+def taper_shift(c, s, nz, extra=0.0):
+    """How far down a tapered pattern is moved at depth s. nz is the vertical
+    part of the roof edge normal; `extra` is added to every strut.
+
+    center = 0: each roof edge stays where it is from the soil side out (it
+    recedes by (strut_in - strut) / 2 along its normal), so holes only grow
+    sideways and downward. center = 1: the outside is unchanged but the soil
+    side moves down by the full recession, so each hole grows evenly all round
+    and its roof rises toward the outside."""
+    strut = taper(c, s)
+    keep = (c.strut_in - strut - extra) / 2 / nz
+    return keep + c.center * (strut - c.strut_out) / 2 / nz
+
+
 # ---------------------------------------------------------------- 3D lattices
 def pat_gyroid(pot, P, th, Z, r, s):
     c = P.gyroid
@@ -128,13 +142,13 @@ def pat_voronoi_taper(pot, P, th, Z, r, s):
     Struts thin from strut_in to strut_out through the wall. The pattern is
     shifted down by the same amount each edge recedes, so every hole grows
     sideways and downward while its roof stays level (a plain short bridge,
-    never a sagging sloped ceiling)."""
+    never a sagging sloped ceiling). `center` trades that for a centred hole
+    (see taper_shift)."""
     c = P.voronoi_taper
     S, ZZ = unroll(pot, th, Z)
     S = S + c.warp * np.sin(2 * np.pi * Z / 47)
     strut = taper(c, s)
-    shift = (c.strut_in - strut) / 2
-    return strut / 2 - voronoi_edge(pot, c, S, ZZ + shift)
+    return strut / 2 - voronoi_edge(pot, c, S, ZZ + taper_shift(c, s, 1.0))
 
 
 def hex_edge(pot, c, th, Z, shift=0.0):
@@ -174,7 +188,7 @@ def pat_hex_taper(pot, P, th, Z, r, s):
     shears the cells and thins some struts."""
     c = P.hex_taper
     strut = taper(c, s) + c.strut_extra
-    shift = (c.strut_in - strut) / 2 / (np.sqrt(3) / 2)
+    shift = taper_shift(c, s, np.sqrt(3) / 2, c.strut_extra)
     hexd, apothem = hex_edge(pot, c, th, Z, shift)
     return hexd - (apothem - strut / 2)
 
@@ -228,8 +242,7 @@ def pat_lattice_taper(pot, P, th, Z, r, s):
     diamond) stays where it is, and the holes grow sideways and downward."""
     c = P.lattice_taper
     strut = taper(c, s)
-    shift = (c.strut_in - strut) / 2 / np.cos(SLOPE)
-    return strut / 2 - lattice_dist(pot, c, th, Z, shift)
+    return strut / 2 - lattice_dist(pot, c, th, Z, taper_shift(c, s, np.cos(SLOPE)))
 
 
 def pat_louvers(pot, P, th, Z, r, s):
@@ -254,21 +267,22 @@ def pat_louvers(pot, P, th, Z, r, s):
 def pat_drops(pot, P, th, Z, r, s):
     """Staggered teardrops with SLOPE pointed tops, flaring outward like
     voronoi_taper: the radius grows from the soil side out and the centre
-    moves down by dR / cos(SLOPE), so the pointed roof stays put."""
+    moves down by dR / cos(SLOPE), so the pointed roof stays put (unless
+    `center` is set, see taper_shift)."""
     c = P.drops
     p = pot.circ / pot.count(c.cells)
     rowh = p * c.row
     S, ZZ = unroll(pot, th, Z)
     strut = taper(c, s)
-    R0 = (p - c.strut_in) / 2
     R = (p - strut) / 2
+    shift = taper_shift(c, s, np.cos(SLOPE))
     sb, cb = np.sin(SLOPE), np.cos(SLOPE)
     j0 = np.floor(ZZ / rowh)
     hole = np.full(S.shape, 1e9, np.float32)
     for dj in (-1, 0, 1):
         j = j0 + dj
         px = np.mod(S - np.mod(j, 2) * p / 2, p) - p / 2
-        pz = ZZ - (j + 0.5) * rowh + (R - R0) / cb
+        pz = ZZ - (j + 0.5) * rowh + shift
         circle = np.hypot(px, pz) - R
         cap = np.maximum(np.abs(px) * sb + pz * cb - R, R * cb - pz)
         hole = np.minimum(hole, np.minimum(circle, cap))

@@ -57,3 +57,39 @@ def test_warns_about_thin_struts(caplog):
     with caplog.at_level(logging.WARNING, logger="pots"):
         pot_from_config(load_config(["pattern=bands", "patterns.voronoi_taper.strut_out=3"]))
     assert "narrow outward" in caplog.text
+
+
+@pytest.mark.parametrize("name", ["voronoi_taper", "hex_taper", "lattice_taper"])
+def test_center_lines_up_the_holes(name):
+    """center=0 keeps each roof level (holes grow downward); center=1 puts
+    the soil-side hole in the middle of its outside opening."""
+    from scipy import ndimage
+    pot = Pot()
+    TH, Z = np.meshgrid(np.linspace(-0.3, 0.3, 500), np.linspace(40, 90, 500))
+    for center in (0.0, 1.0):
+        P = load_params()
+        c = getattr(P, name)
+        c.strut_in, c.strut_out, c.center = 2.2, 1.1, center
+        fn = PATTERNS[name].fn
+        inner = fn(pot, P, TH, Z, pot.r0, np.zeros_like(Z)) < 0
+        outer = fn(pot, P, TH, Z, pot.r0, np.ones_like(Z)) < 0
+        lo, _ = ndimage.label(outer)
+        li, n = ndimage.label(inner)
+        d_roof, d_mid = [], []
+        for k in range(1, n + 1):
+            mi = li == k
+            om = lo == np.bincount(lo[mi]).argmax()
+            if any(m[[0, -1]].any() or m[:, [0, -1]].any() for m in (mi, om)):
+                continue
+            d_roof.append(Z[om].max() - Z[mi].max())
+            d_mid.append(Z[mi].mean() - Z[om].mean())
+        level, centred = np.mean(d_roof) < 0.15, abs(np.mean(d_mid)) < 0.1
+        assert (level, centred) == ((True, False) if center == 0 else (False, True))
+
+
+def test_center_is_checked(caplog):
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        pot_from_config(load_config(["patterns.voronoi_taper.center=1.5"]))
+    with caplog.at_level(logging.WARNING, logger="pots"):
+        pot_from_config(load_config(["patterns.voronoi_taper.center=1"]))
+    assert "may sag" in caplog.text

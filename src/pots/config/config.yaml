@@ -14,7 +14,7 @@ defaults:
   # This file first, so the size preset below can override it.
   - _self_
   # Mesh quality preset: `full` or `draft` (files in config/quality/).
-  - quality: full
+  - quality: draft
   # Pot size preset: `big` (130 mm) or `small` (50 mm), files in
   # config/size/. Sets `height` and `design.wall`.
   - size: small
