@@ -16,7 +16,7 @@ def test_shape_scales_but_print_sizes_do_not():
     assert half.r_bot == pytest.approx(ref.r_bot / 2)
     assert half.r_top == pytest.approx(ref.r_top / 2)
     assert half.cup_h == pytest.approx(ref.cup_h / 2)
-    assert (half.wall, half.rim, half.base, half.strut_out) == (ref.wall, ref.rim, ref.base, ref.strut_out)
+    assert (half.wall, half.rim, half.base) == (ref.wall, ref.rim, ref.base)
 
 
 @pytest.mark.parametrize("h", [30, 65, 130, 200])

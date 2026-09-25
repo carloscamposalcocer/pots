@@ -15,7 +15,7 @@ Usage
     pots-gallery size=big --images pics  # the 130 mm pot, images in pics/
     pots-gallery height=90 design.wall=5
 
-Takes the shape settings of `pots` (size, height, design.*, quality); `pattern`,
+Takes the shape settings of `pots` (size, height, design.*, patterns.*, quality); `pattern`,
 `out` and `preview` don't apply. The pot defaults to the config's size preset
 (small). Mesh quality defaults to quality.voxel=0.35 quality.faces=400000,
 between draft and full and fine enough for 1.1 mm struts to show;
@@ -73,7 +73,7 @@ def main(argv=None):
     log.info("pot H %g mm, wall %g mm, voxel %g mm -> %s", pot.height, pot.wall, cfg.quality.voxel, images)
     for name in names or list(PATTERNS):
         t = time.perf_counter()
-        m, field = generate(pot, name, cfg.quality.voxel, cfg.quality.faces)
+        m, field = generate(pot, name, cfg.quality.voxel, cfg.quality.faces, cfg.patterns)
         if not m.is_watertight or m.body_count != 1:
             log.warning("%s: mesh is not a single watertight body", name)
         render_card(m, field, pot, images / f"{name}.png", f"{name}  (H {pot.height:g} mm)")

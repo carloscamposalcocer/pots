@@ -20,7 +20,7 @@ def test_small_draft_pot_is_one_watertight_body(tmp_path):
 
 def test_loose_parts_are_reported(caplog, monkeypatch):
     """Ring-shaped holes cut out islands (what sank `coral`): the build warns."""
-    def rings(pot, th, Z, r, s):
+    def rings(pot, P, th, Z, r, s):
         p = pot.circ / 20
         d = np.hypot(np.mod(th * pot.r0, p) - p / 2, np.mod(Z, 8.0) - 4.0)
         return np.abs(d - 2.5) - 0.7

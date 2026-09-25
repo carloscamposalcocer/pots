@@ -18,17 +18,21 @@ defaults:
   # Pot size preset: `big` (130 mm) or `small` (50 mm), files in
   # config/size/. Sets `height` and `design.wall`.
   - size: small
+  # Settings of every wall pattern (cell size, struts, ...), one block per
+  # pattern: config/patterns.yaml. Override as patterns.<name>.<key>=value.
+  - patterns
 
 # ---------------------------------------------------------------------
 # pattern: the perforation/lattice used for the pot wall.
 #   voronoi_taper  organic cells that flare outward like funnels: small
 #                  holes on the soil side, big ones outside (default,
-#                  best air/soil balance). Strut widths: design.strut_*.
+#                  best air/soil balance).
 #   voronoi        same organic cells, straight holes (1.8 mm struts).
 #   hex            warped honeycomb, pointy-top cells (1.8 mm struts).
 #   hex_taper      the honeycomb flaring outward like voronoi_taper.
 #   drops          staggered teardrops flaring outward like voronoi_taper.
 #   lattice        diamond trellis of crossing helical strips.
+#   lattice_taper  the trellis flaring outward like voronoi_taper.
 #   isogrid        triangle grid.
 #   louvers        gills sloping down and out: no line of sight, soil
 #                  stays in, rain runs off.
@@ -72,13 +76,4 @@ design:
   # Wall thickness of the plain drip cup around the bottom.
   cup_wall: 2.4
 
-  # voronoi_taper only. Strut width on the soil side (inner face). The
-  # struts thin linearly to strut_out on the outside, so every hole is a
-  # funnel. Wider = smaller holes on the soil side = less soil loss,
-  # less air. 2.2 gives ~29% open with ~2.5 mm holes inside.
-  strut_in: 2.2
-
-  # voronoi_taper only. Strut width on the outer face. Keep it >= ~1.1 mm
-  # (the minimum a 0.4 mm nozzle prints reliably) and <= strut_in (so
-  # holes widen outward). 1.1 gives ~58% open with ~3.6 mm holes outside.
-  strut_out: 1.1
+# Pattern settings (cell size, strut widths, ...): config/patterns.yaml.

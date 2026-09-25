@@ -5,15 +5,18 @@ solid rim, solid base, and the plain drip cup fused to the base.
 import numpy as np
 
 from .geometry import CHAMFER, PATTERN_GAP
-from .patterns import PATTERNS
+from .patterns import PATTERNS, load_params
 from .sdf import cylindrical, smin
 
 BLEND = 1.5           # blend between a 3D lattice and the solid rim/base band
 
 
-def make_field(pot, pattern):
-    """Return field(X, Y, Z) for `pot` with the wall pattern named `pattern`."""
-    kind, fn, _ = PATTERNS[pattern]
+def make_field(pot, pattern, params=None):
+    """Return field(X, Y, Z) for `pot` with the wall pattern named `pattern`.
+    `params`: the pattern settings (the `patterns` config node); None = the
+    defaults in config/patterns.yaml."""
+    kind, fn = PATTERNS[pattern].kind, PATTERNS[pattern].fn
+    P = load_params(params)
 
     def field(X, Y, Z):
         r, th = cylindrical(X, Y)
@@ -24,9 +27,9 @@ def make_field(pot, pattern):
         band_hi = (pot.height - pot.rim) - Z
         band = np.minimum(band_lo, band_hi)       # >0 inside the pattern band
         if kind == "3d":
-            mat = smin(fn(pot, th, Z, r, s), band, BLEND)   # solid outside the band
+            mat = smin(fn(pot, P, th, Z, r, s), band, BLEND)   # solid outside the band
         else:
-            hole = np.maximum(fn(pot, th, Z, r, s), -band)  # holes only inside the band
+            hole = np.maximum(fn(pot, P, th, Z, r, s), -band)  # holes only inside the band
             mat = -hole
         wall = np.maximum(shell, mat)
         ci = pot.cup_ri(Z)

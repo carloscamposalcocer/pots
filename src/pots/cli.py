@@ -11,6 +11,8 @@ Examples
     pots size=big height=100          # start from a preset, change one value
     pots pattern=hex                  # another pattern
     pots design.wall=4                # thinner wall (mm, does not scale)
+    pots pattern=lattice_taper patterns.lattice_taper.strut_in=2.5
+                                      # a pattern setting (config/patterns.yaml)
     pots height=65 --show             # print the resolved settings, don't build
     pots --all quality=draft          # every pattern, one after another
     pots -v                           # debug logging (per-slab marching cubes)
@@ -61,11 +63,20 @@ def pot_from_config(cfg):
     if cfg.pattern not in PATTERNS:
         raise ValueError(f"unknown pattern '{cfg.pattern}'; choose from: {', '.join(sorted(PATTERNS))}")
     pot = Pot(height=float(cfg.height), **{k: float(v) for k, v in cfg.design.items()})
-    if pot.strut_out < 1.1:
-        log.warning("design.strut_out=%.2f mm is below ~1.1 mm, too thin for a 0.4 mm nozzle", pot.strut_out)
-    if pot.strut_out > pot.strut_in:
-        log.warning("design.strut_out > design.strut_in: voronoi_taper holes will narrow outward")
+    check_pattern_params(cfg)
     return pot
+
+
+def check_pattern_params(cfg):
+    """Warn about pattern settings that won't print well."""
+    for name in (cfg.pattern, *PATTERNS[cfg.pattern].uses):
+        c = cfg.patterns[name]
+        for key in ("strut", "strut_out"):
+            if key in c and c[key] < 1.1:
+                log.warning("patterns.%s.%s=%.2f mm is below ~1.1 mm, too thin for a 0.4 mm nozzle",
+                            name, key, c[key])
+        if "strut_in" in c and c.strut_out > c.strut_in:
+            log.warning("patterns.%s.strut_out > strut_in: the holes will narrow outward", name)
 
 
 def setup_logging(verbose):
@@ -101,7 +112,7 @@ def run(cfg):
     base = out / f"pot_{cfg.pattern}"
     t = time.perf_counter()
     log.info("[1/3] building")
-    m, field = generate(pot, cfg.pattern, q.voxel, q.faces)
+    m, field = generate(pot, cfg.pattern, q.voxel, q.faces, cfg.patterns)
     size = np.ptp(m.bounds, axis=0)
     log.info("mesh  faces=%s  watertight=%s  bodies=%d  size=%.1f x %.1f x %.1f mm  volume=%.0f cm3",
              f"{len(m.faces):,}", m.is_watertight, m.body_count, *size, m.volume / 1000)

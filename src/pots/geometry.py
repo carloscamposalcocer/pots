@@ -3,8 +3,8 @@ Pot dimensions.
 
 `Pot` holds every size of one pot. The height drives the shape: radii, cup
 height, moat gap and the cell counts around the circumference all scale by
-k = height / H_REF. The print-physics sizes (wall, rim, base, cup wall,
-struts) stay fixed in mm because they depend on the nozzle and the soil,
+k = height / H_REF. The print-physics sizes (wall, rim, base, cup wall)
+stay fixed in mm because they depend on the nozzle and the soil,
 not on how big the pot is.
 
 All dimensions in mm.
@@ -33,8 +33,6 @@ class Pot:
     rim: float = 5.0           # solid band at the top
     base: float = 2.4          # solid floor shared by pot and cup
     cup_wall: float = 2.4      # drip cup wall thickness
-    strut_in: float = 2.2      # voronoi_taper strut width, soil side
-    strut_out: float = 1.1     # voronoi_taper strut width, outside
 
     def __post_init__(self):
         if self.height < self.min_height:
