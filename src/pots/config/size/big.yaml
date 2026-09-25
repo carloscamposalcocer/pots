@@ -7,7 +7,7 @@
 # all scale by height / 130, so the proportions stay the same. The
 # design sizes and the hole size do NOT scale.
 # Minimum: base + rim + 10 mm (17.4 mm with the defaults).
-height: 130
+height: 100
 
 design:
   # Pot wall thickness (mm), measured radially. The pattern goes through
