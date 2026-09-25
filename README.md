@@ -30,6 +30,7 @@ pots size=small quality=draft         # fast low-res check of the 50 mm pot
 pots size=big height=100              # start from a preset, change one value
 pots pattern=hex design.wall=4        # another pattern, thinner wall
 pots height=65 --show                 # print the final settings, don't build
+pots --all quality=draft              # every pattern, one after another
 pots -v                               # debug logging
 pots --help                           # usage and the list of patterns
 ```

@@ -38,7 +38,7 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
   - pipeline.py: `generate(pot, pattern, voxel, faces)` -> (mesh, field).
   - metrics.py: `wall_metrics(field, pot)`: open %, median hole diameter of both wall faces, and straight-through % (open at 5 depths along the same radial ray); `overhang_share(mesh)`: share of the surface facing down more than 50 deg from vertical, not counting level bridges or the bed face. Both are logged on every build.
   - preview.py: matplotlib PNG (outside, cut-away, section, both wall faces with open %).
-  - cli.py: the `pots` command; exports STL + 3MF + PNG + resolved config.yaml.
+  - cli.py: the `pots` command; exports STL + 3MF + PNG + resolved config.yaml; `--all` builds every pattern sequentially (each in its own `out`; a fixed `out=x` becomes x/<pattern>).
   - gallery.py: the `pots-gallery` command; builds every pattern in memory (sequentially) and saves only `preview.render_card` images to docs/patterns/<name>.png, which the README Patterns section shows. Rerun it after changing a pattern.
 - tests/: pytest; geometry scaling, seamlessness at theta = ±pi for every pattern, solid base/rim/cup, tapered-pattern and soil-holding metrics, louvers line of sight, a small draft build (watertight, 1 body), CLI config handling. `-m slow`: a draft build of every pattern with no loose parts and overhang share < 12%.
 - The old two-piece pot (pot_v2 pot_field/cup_field) and the standalone scripts were removed in the src/ refactor; they are in git history before that commit.

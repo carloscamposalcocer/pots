@@ -12,9 +12,11 @@ Examples
     pots pattern=hex                  # another pattern
     pots design.wall=4                # thinner wall (mm, does not scale)
     pots height=65 --show             # print the resolved settings, don't build
+    pots --all quality=draft          # every pattern, one after another
     pots -v                           # debug logging (per-slab marching cubes)
 
 Options
+    --all           build every pattern (sequentially), each in its own `out`
     --show          print the resolved config and exit
     -v, --verbose   debug logging
     -h, --help      this help
@@ -38,7 +40,7 @@ from .patterns import PATTERNS
 log = logging.getLogger("pots")
 
 CONFIG_DIR = Path(__file__).parent / "config"
-FLAGS = {"-v", "--verbose", "--show"}
+FLAGS = {"-v", "--verbose", "--show", "--all"}
 
 
 def usage():
@@ -127,13 +129,59 @@ def main(argv=None):
     unknown = flags - FLAGS
     if unknown:
         raise SystemExit(f"unknown option(s): {' '.join(sorted(unknown))}  (settings are key=value, see --help)")
-    from hydra.errors import HydraException
+    overrides = [a for a in argv if not a.startswith("-")]
+    if "--all" in flags:
+        run_all(overrides, "--show" in flags, bool(flags & {"-v", "--verbose"}))
+        return
     from omegaconf import OmegaConf
-    try:
-        cfg = load_config([a for a in argv if not a.startswith("-")])
-    except HydraException as e:
-        raise SystemExit(f"bad setting: {e}".splitlines()[0] + "  (see --show for valid keys)")
+    cfg = compose(overrides)
     if "--show" in flags:
         print(OmegaConf.to_yaml(cfg, resolve=True), end=""); return
     setup_logging(bool(flags & {"-v", "--verbose"}))
     run(cfg)
+
+
+def compose(overrides):
+    from hydra.errors import HydraException
+    try:
+        return load_config(overrides)
+    except HydraException as e:
+        raise SystemExit(f"bad setting: {e}".splitlines()[0] + "  (see --show for valid keys)")
+
+
+def all_configs(overrides):
+    """One config per pattern. If `out` doesn't depend on the pattern (out=foo),
+    each pattern goes to its own subfolder, <out>/<pattern>."""
+    if any(a.split("=")[0].lstrip("+~") == "pattern" for a in overrides):
+        raise SystemExit("--all builds every pattern; drop pattern=...")
+    cfgs = {n: compose(overrides + [f"pattern={n}"]) for n in PATTERNS}
+    if len({c.out for c in cfgs.values()}) < len(cfgs):
+        for n, c in cfgs.items():
+            c.out = f"{c.out}/{n}"
+    return cfgs
+
+
+def run_all(overrides, show, verbose):
+    """Build every pattern one after another (never in parallel: memory).
+    A failing pattern is logged and skipped; exits 1 at the end if any failed."""
+    cfgs = all_configs(overrides)
+    if show:
+        for n, c in cfgs.items():
+            print(f"{n:<15} -> {c.out}")
+        return
+    setup_logging(verbose)
+    failed = []
+    t = time.perf_counter()
+    for i, (n, c) in enumerate(cfgs.items(), 1):
+        log.info("===== pattern %d/%d: %s =====", i, len(cfgs), n)
+        try:
+            run(c)
+        except SystemExit:
+            raise  # bad settings: the same for every pattern
+        except Exception:
+            log.exception("%s failed", n)
+            failed.append(n)
+    log.info("all patterns done in %.0f s; %d built, %d failed%s", time.perf_counter() - t,
+             len(cfgs) - len(failed), len(failed), f": {' '.join(failed)}" if failed else "")
+    if failed:
+        raise SystemExit(1)

@@ -1,6 +1,7 @@
 import pytest
 
 from pots.cli import load_config, main, pot_from_config
+from pots.patterns import PATTERNS
 
 
 def test_defaults_compose():
@@ -41,3 +42,21 @@ def test_size_presets(size, height, wall):
 def test_overrides_beat_size_preset():
     pot = pot_from_config(load_config(["size=big", "height=100", "design.wall=5"]))
     assert (pot.height, pot.wall) == (100, 5)
+
+
+def test_all_configs(capsys):
+    main(["--all", "--show", "height=65"])
+    out = capsys.readouterr().out.splitlines()
+    assert len(out) == len(PATTERNS)
+    assert "hex             -> output/hex_h65" in out
+    main(["--all", "--show", "out=pics"])
+    assert "hex             -> pics/hex" in capsys.readouterr().out
+    with pytest.raises(SystemExit, match="drop pattern"):
+        main(["--all", "pattern=hex"])
+
+
+def test_all_runs_every_pattern(monkeypatch):
+    built = []
+    monkeypatch.setattr("pots.cli.run", lambda cfg: built.append(cfg.pattern))
+    main(["--all", "quality=draft"])
+    assert built == list(PATTERNS)
