@@ -1,7 +1,7 @@
 """
 pots: generate the plant pot as STL + 3MF + preview image.
 
-Every setting has a default in the packaged conf/config.yaml; pass only what
+Every setting has a default in the packaged config/config.yaml; pass only what
 you change, as key=value (Hydra syntax, nested keys use dots).
 
 Examples
@@ -37,7 +37,7 @@ from .patterns import PATTERNS
 
 log = logging.getLogger("pots")
 
-CONF_DIR = Path(__file__).parent / "conf"
+CONFIG_DIR = Path(__file__).parent / "config"
 FLAGS = {"-v", "--verbose", "--show"}
 
 
@@ -50,7 +50,7 @@ def load_config(overrides):
     # Compose API instead of @hydra.main: hydra-core 1.3's own argparse CLI
     # crashes on Python 3.14. Overrides use the same key=value syntax.
     import hydra
-    with hydra.initialize_config_dir(config_dir=str(CONF_DIR), version_base="1.3"):
+    with hydra.initialize_config_dir(config_dir=str(CONFIG_DIR), version_base="1.3"):
         return hydra.compose("config", overrides=overrides)
 
 

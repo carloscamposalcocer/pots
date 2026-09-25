@@ -13,10 +13,10 @@
 defaults:
   # This file first, so the size preset below can override it.
   - _self_
-  # Mesh quality preset: `full` or `draft` (files in conf/quality/).
+  # Mesh quality preset: `full` or `draft` (files in config/quality/).
   - quality: full
   # Pot size preset: `big` (130 mm) or `small` (50 mm), files in
-  # conf/size/. Sets `height` and `design.wall`.
+  # config/size/. Sets `height` and `design.wall`.
   - size: small
 
 # ---------------------------------------------------------------------
@@ -34,7 +34,7 @@ defaults:
 # ---------------------------------------------------------------------
 pattern: voronoi_taper
 
-# height (mm) comes from the size preset (conf/size/); see there.
+# height (mm) comes from the size preset (config/size/); see there.
 
 # preview: also render a PNG (outside view, cut-away, vertical section,
 # and both wall faces at true scale with their open %). Costs ~10 s.
@@ -51,7 +51,7 @@ out: output/${pattern}_h${height}
 # soil, not on how big the pot is.
 # ---------------------------------------------------------------------
 design:
-  # wall (pot wall thickness) comes from the size preset (conf/size/).
+  # wall (pot wall thickness) comes from the size preset (config/size/).
 
   # Solid band at the top of the pot (no holes). Gives the rim its
   # stiffness and a clean edge to hold.

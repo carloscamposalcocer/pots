@@ -20,7 +20,7 @@ This installs the `pots` and `pots-gallery` commands into the project venv. Run 
 
 ## Usage
 
-All settings live in [`src/pots/conf/config.yaml`](src/pots/conf/config.yaml)
+All settings live in [`src/pots/config/config.yaml`](src/pots/config/config.yaml)
 and have defaults. Override only what you want to change, as `key=value`:
 
 ```sh
@@ -61,7 +61,7 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `full` | Mesh quality preset: `full` or `draft`. |
 
-### Size presets (`src/pots/conf/size/`)
+### Size presets (`src/pots/config/size/`)
 
 Each preset sets the height and the wall thickness. Anything on the
 command line still wins, so `size=big height=110` is a big pot made
@@ -72,7 +72,7 @@ command line still wins, so `size=big height=110` is a big pot made
 | `height` | 130 (151 mm wide) | 50 (~62 mm wide with the cup) |
 | `design.wall` | 6.0 | 4.0 |
 
-### Quality presets (`src/pots/conf/quality/`)
+### Quality presets (`src/pots/config/quality/`)
 
 | Key | `full` | `draft` | Description |
 |---|---|---|---|
@@ -181,7 +181,7 @@ print(wall_metrics(field, pot))                # open %, hole size on both faces
 src/pots/
   cli.py        `pots` command: config, build, export, preview
   gallery.py    `pots-gallery` command: every pattern + README images
-  conf/         Hydra config: config.yaml and the quality/ and size/ presets
+  config/       Hydra config: config.yaml and the quality/ and size/ presets
   geometry.py   Pot: all dimensions, scaled from the height
   patterns.py   wall patterns (PATTERNS registry)
   coral.py      reaction-diffusion texture for `coral`, with its disk cache
