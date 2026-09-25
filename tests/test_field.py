@@ -39,6 +39,19 @@ def test_solid_base_rim_and_cup(name):
     assert (f(np.zeros(1, np.float32), np.zeros(1, np.float32), np.float32([pot.height / 2])) > 0).all()
 
 
+@pytest.mark.parametrize("name", PATTERNS)
+def test_flat_bottom(name):
+    """Nothing sits below z = 0 (the blends used to bulge 0.25 mm under the
+    wall and cup, lifting the rest of the base off the bed), and the base is
+    solid right down to it across the whole footprint."""
+    pot = Pot(height=65, wall=4.0)
+    f = make_field(pot, name)
+    r = np.linspace(0, pot.cup_ri(0) + pot.cup_wall - 1.0, 400).astype(np.float32)
+    y = np.zeros_like(r)
+    assert (f(r, y, np.full_like(r, -0.05)) > 0).all()
+    assert (f(r, y, np.full_like(r, 0.05)) < 0).all()
+
+
 def test_voronoi_taper_opens_outward():
     pot = Pot()
     m = wall_metrics(make_field(pot, "voronoi_taper"), pot)

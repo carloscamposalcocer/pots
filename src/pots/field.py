@@ -34,6 +34,9 @@ def make_field(pot, pattern):
         cup_wall = np.maximum.reduce([r - co, ci - r, -Z, Z - pot.cup_h])
         base = np.maximum.reduce([r - co, -Z, Z - pot.base])
         body = smin(smin(wall, base, 1.0), cup_wall, 1.0)
+        # the blends also round the z = 0 faces and bulge below the bed; cut
+        # flat so the whole base touches the first layer
+        body = np.maximum(body, -Z)
         # 45 deg chamfer on the bottom outer edge (elephant foot)
         return np.maximum(body, ((r - co) + (CHAMFER - Z)) / np.sqrt(2))
 
