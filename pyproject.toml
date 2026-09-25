@@ -1,7 +1,7 @@
 [project]
 name = "pots"
 version = "0.1.0"
-description = "Add your description here"
+description = "Single-piece, support-free, 3D-printable breathing plant pot, generated from an implicit field"
 readme = "README.md"
 authors = [
     { name = "Carlos Campos", email = "carlos.campos@reeldata.ai" }
@@ -21,8 +21,18 @@ dependencies = [
 ]
 
 [project.scripts]
-pots = "pots:main"
+pots = "pots.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning:skimage.*"]

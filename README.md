@@ -11,24 +11,26 @@ cubes) and exported as STL + 3MF, with a PNG preview.
 ## Setup
 
 ```sh
-uv sync                      # or: pip install -r requirements.txt
+uv sync                      # or: pip install -e .
 ```
 
-Run everything with the project venv (`.venv/Scripts/python.exe` on Windows,
-`.venv/bin/python` elsewhere, or `uv run python`).
+This installs the `pots` command into the project venv. Run it with
+`uv run pots ...`, or activate the venv and call `pots` directly
+(`python -m pots` works too).
 
 ## Usage
 
-All settings live in [`conf/config.yaml`](conf/config.yaml) and have
-defaults. Override only what you want to change, as `key=value`:
+All settings live in [`src/pots/conf/config.yaml`](src/pots/conf/config.yaml)
+and have defaults. Override only what you want to change, as `key=value`:
 
 ```sh
-python make_pot.py                                  # build with the config defaults
-python make_pot.py quality=draft                    # fast low-res check
-python make_pot.py height=65                        # half-size pot, same shape
-python make_pot.py pattern=coral design.wall=4      # another pattern, thinner wall
-python make_pot.py height=65 --show                 # print the final settings, don't build
-python make_pot.py -v                               # debug logging
+pots                                  # build with the config defaults
+pots quality=draft                    # fast low-res check
+pots height=65                        # half-size pot, same shape
+pots pattern=coral design.wall=4      # another pattern, thinner wall
+pots height=65 --show                 # print the final settings, don't build
+pots -v                               # debug logging
+pots --help                           # usage and the list of patterns
 ```
 
 Settings use Hydra/OmegaConf syntax, so nested keys use dots
@@ -57,15 +59,15 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `full` | Mesh quality preset: `full` or `draft`. |
 
-\* The reference shape is 130 mm; `conf/config.yaml` may currently hold a
+\* The reference shape is 130 mm; `config.yaml` may currently hold a
 different working value.
 
-### Quality presets (`conf/quality/`)
+### Quality presets (`src/pots/conf/quality/`)
 
 | Key | `full` | `draft` | Description |
 |---|---|---|---|
 | `quality.voxel` | 0.3 | 0.6 | Mesh grid spacing in mm. Time and memory grow ~1/voxel³: full at 130 mm takes ~2–3 min and 2–3 GB RAM, draft ~1 min. Don't run several full builds in parallel. |
-| `quality.faces` | 900 000 | 300 000 | Triangle budget; the mesh is decimated to this. |
+| `quality.faces` | 900 000 | 100 000 | Triangle budget; the mesh is decimated to this. |
 
 You can also override a single value: `quality=draft quality.voxel=0.45`.
 
@@ -108,7 +110,7 @@ same-size holes and a proportionally thicker wall.
 | `voronoi_taper` | 2D, tapered | Organic cells that flare outward like funnels. Default. |
 | `voronoi` | 2D | Same cells, straight-through holes, 1.8 mm struts. |
 | `hex` | 2D | Warped honeycomb, pointy-top cells, 1.8 mm struts. |
-| `coral` | 2D | Reaction-diffusion (Turing) labyrinth. Its texture is generated on first use at each height (slow) and cached as `coral_tex*.npy`. |
+| `coral` | 2D | Reaction-diffusion (Turing) labyrinth. Its texture is generated on first use at each height (slow) and cached in `~/.cache/pots` (or `$POTS_CACHE_DIR`). |
 | `slots` | 2D | Narrow wavy vertical slots, air-pruning style. |
 | `gyroid` | 3D lattice | Graded density through the wall, no straight line of sight. |
 | `diamond` | 3D lattice | Schwarz diamond, straighter 45° channels. |
@@ -128,16 +130,48 @@ The generator follows these; keep them when changing the code:
 - 45° chamfer on the bottom outer edge (elephant foot).
 - Every pattern is periodic around the circumference.
 
+## Using it from Python
+
+```python
+from pots import Pot, generate
+from pots.metrics import wall_metrics
+
+pot = Pot(height=65, wall=4.0)                 # every size of one pot
+mesh, field = generate(pot, "voronoi_taper", voxel=0.6, faces=100_000)
+mesh.export("pot.3mf")
+print(wall_metrics(field, pot))                # open %, hole size on both faces
+```
+
 ## Code layout
 
-| File | Role |
-|---|---|
-| `make_pot.py` | Entry point: loads the config, builds, cleans (decimate, keep largest body, repair), exports and previews. |
-| `conf/` | Hydra config: `config.yaml` and the `quality/` presets. |
-| `patterns.py` | Wall patterns (`PATTERNS`), `make_field()` (wall + base + cup) and `set_height()`. |
-| `pot_v3.py` | Cup and base parameters. |
-| `pot_v2.py` | Global dimensions, shared helpers (`smin`, `gyroid`, `build` = slab-wise marching cubes). |
+```
+src/pots/
+  cli.py        `pots` command: config, build, export, preview
+  conf/         Hydra config: config.yaml and the quality/ presets
+  geometry.py   Pot: all dimensions, scaled from the height
+  patterns.py   wall patterns (PATTERNS registry)
+  coral.py      reaction-diffusion texture for `coral`, with its disk cache
+  field.py      make_field(): wall + rim + base + cup as one implicit field
+  sdf.py        field helpers (smin, cylindrical gyroid)
+  mesh.py       slab-wise marching cubes, decimation and repair
+  pipeline.py   generate(): field -> clean, watertight mesh
+  metrics.py    open %, hole size and straight-through % of both wall faces
+  preview.py    PNG preview
+tests/          pytest suite (uv run pytest)
+```
 
-Hydra note: `make_pot.py` loads the config with Hydra's compose API rather
-than `@hydra.main`, because hydra-core 1.3's own CLI crashes on Python 3.14.
+The model is an implicit field (negative = solid), meshed with marching
+cubes in z-slabs, then decimated, reduced to its largest body and repaired.
+Each build logs whether the mesh is watertight and a single body, plus the
+wall metrics.
+
+Hydra note: the config is loaded with Hydra's compose API rather than
+`@hydra.main`, because hydra-core 1.3's own CLI crashes on Python 3.14.
 The `key=value` syntax is the same; `--show` replaces `--cfg job`.
+
+## Development
+
+```sh
+uv sync            # installs the dev group (pytest) too
+uv run pytest      # ~15 s, includes a small draft build
+```

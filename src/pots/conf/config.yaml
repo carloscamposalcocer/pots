@@ -1,11 +1,11 @@
 # =====================================================================
-# Plant pot generator settings (read by make_pot.py through Hydra).
+# Plant pot generator settings (read by the pots command through Hydra).
 #
 # Every value here is a default: override any of them on the command
 # line with key=value, no need to edit this file.
-#   python make_pot.py height=65 quality=draft
-#   python make_pot.py pattern=coral design.wall=4
-#   python make_pot.py --show          # print the final settings, no build
+#   pots height=65 quality=draft
+#   pots pattern=coral design.wall=4
+#   pots --show          # print the final settings, no build
 # See README.md for the full description of each parameter.
 # =====================================================================
 
