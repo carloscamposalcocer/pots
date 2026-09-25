@@ -31,8 +31,7 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
 ## Code architecture
 - `src/pots/`:
   - geometry.py: `Pot` (all dimensions, derived ones as cached properties; r_out/r_in/cup_ri) and the reference constants (H_REF, radii, cup, LIP, CHAMFER).
-  - patterns.py: `PATTERNS` registry of `Pattern(kind, fn, description)`; each pattern is `fn(pot, th, Z, r, s)`. Kinds: "3d" lattices (gyroid, diamond; graded density through the wall; field = material) and "2d" radial perforations (voronoi, voronoi_taper, hex, coral, slots; field = hole). Unrolled coordinates use `pot.r0` (64 mm at H_REF).
-  - coral.py: Gray-Scott texture for `coral`, cached as `coral_{nx}x{nz}.npy` in `$POTS_CACHE_DIR` or `~/.cache/pots`.
+  - patterns.py: `PATTERNS` registry of `Pattern(kind, fn, description)`; each pattern is `fn(pot, th, Z, r, s)`. Kinds: "3d" lattices (gyroid, diamond; graded density through the wall; field = material) and "2d" radial perforations (voronoi, voronoi_taper, hex, slots; field = hole). Unrolled coordinates use `pot.r0` (64 mm at H_REF).
   - field.py: `make_field(pot, pattern)` assembles lattice wall + rim + base + cup.
   - sdf.py: smin, cylindrical(), gyroid(), CELL, T_IN/T_OUT.
   - mesh.py: `build()` = skimage marching_cubes in z-slabs. Slab vertices stay in index space until after merge_vertices, then get scaled. That is what makes the slab seams watertight; don't change it. `clean()` = fast_simplification decimation, keep the largest component, pymeshfix, fix_normals, drop to z=0.

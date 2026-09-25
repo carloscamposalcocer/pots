@@ -5,7 +5,7 @@ Each pattern is `fn(pot, th, Z, r, s)` and returns a field for points in the
 wall, where s goes from 0 on the soil side to 1 outside. Two kinds:
   - "3d" lattices (gyroid, diamond): the field is the wall MATERIAL
     (negative = solid). Tortuous channels, no straight line of sight.
-  - "2d" perforations (voronoi, hex, coral, slots): the field is the HOLE
+  - "2d" perforations (voronoi, hex, slots): the field is the HOLE
     (negative = open), cut radially through the wall. Every hole roof is a
     bridge no longer than the hole width.
 
@@ -18,7 +18,6 @@ from typing import Callable, NamedTuple
 
 import numpy as np
 
-from . import coral
 from .sdf import CELL, T_IN, T_OUT, gyroid
 
 GYROID_NC_REF = 48
@@ -131,18 +130,6 @@ def pat_hex(pot, th, Z, r, s):
     return hexd - (apothem - STRUT / 2)
 
 
-def pat_coral(pot, th, Z, r, s):
-    """Reaction-diffusion (Turing) pattern: coral / fingerprint labyrinth."""
-    from scipy import ndimage
-    d, px = coral.texture(pot)
-    S, ZZ = unroll(pot, th, Z)
-    ix = np.mod(S, pot.circ) / px
-    iz = (ZZ + 4) / px
-    val = ndimage.map_coordinates(d, [iz.ravel(), ix.ravel()], order=1, mode="grid-wrap").reshape(S.shape)
-    # val > 0 : open (inside a hole) ; shrink holes slightly so struts >= ~1.6 mm
-    return -(val - 0.4)
-
-
 def pat_slots(pot, th, Z, r, s):
     """Air-pruning style: narrow wavy vertical slots with pointed ends."""
     pitch = pot.circ / pot.count(SLOT_NC_REF)
@@ -163,7 +150,6 @@ PATTERNS = {
     "voronoi_taper": Pattern("2d", pat_voronoi_taper, "organic cells flaring outward like funnels (default)"),
     "voronoi": Pattern("2d", pat_voronoi, "organic cells, straight holes"),
     "hex": Pattern("2d", pat_hex, "warped honeycomb, pointy-top cells"),
-    "coral": Pattern("2d", pat_coral, "reaction-diffusion labyrinth (slow first run, cached)"),
     "slots": Pattern("2d", pat_slots, "narrow wavy vertical slots, air-pruning style"),
     "gyroid": Pattern("3d", pat_gyroid, "3D lattice, no straight line of sight"),
     "diamond": Pattern("3d", pat_diamond, "3D lattice, straighter 45-degree channels"),

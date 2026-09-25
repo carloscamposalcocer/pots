@@ -4,8 +4,6 @@ import pytest
 from pots import PATTERNS, Pot, make_field
 from pots.metrics import wall_metrics
 
-FAST = [n for n in PATTERNS if n != "coral"]      # coral needs its slow texture
-
 
 def ring(pot, frac, z, th):
     r = pot.r_out(z) - pot.wall * frac
@@ -13,7 +11,7 @@ def ring(pot, frac, z, th):
         np.full_like(th, z, dtype=np.float32)
 
 
-@pytest.mark.parametrize("name", FAST)
+@pytest.mark.parametrize("name", PATTERNS)
 @pytest.mark.parametrize("h", [65, 130])
 def test_seamless_around_the_pot(name, h):
     """The field just below theta = +pi matches the field just above -pi."""
@@ -27,7 +25,7 @@ def test_seamless_around_the_pot(name, h):
             assert a == pytest.approx(b, abs=1e-2)
 
 
-@pytest.mark.parametrize("name", FAST)
+@pytest.mark.parametrize("name", PATTERNS)
 def test_solid_base_rim_and_cup(name):
     pot = Pot(height=65, wall=4.0)
     f = make_field(pot, name)

@@ -28,7 +28,7 @@ pots                                  # build with the config defaults (size=sma
 pots size=big                         # the 130 mm reference pot
 pots size=small quality=draft         # fast low-res check of the 50 mm pot
 pots size=big height=100              # start from a preset, change one value
-pots pattern=coral design.wall=4      # another pattern, thinner wall
+pots pattern=hex design.wall=4        # another pattern, thinner wall
 pots height=65 --show                 # print the final settings, don't build
 pots -v                               # debug logging
 pots --help                           # usage and the list of patterns
@@ -122,14 +122,11 @@ from outside, next to a 40 x 30 mm true-scale swatch of the outer wall face
 | | |
 |---|---|
 | **`voronoi_taper`** (default), 2D, tapered: organic cells that flare outward like funnels. <br> ![voronoi_taper](docs/patterns/voronoi_taper.png) | **`voronoi`**, 2D: the same cells with straight-through holes and 1.8 mm struts. <br> ![voronoi](docs/patterns/voronoi.png) |
-| **`hex`**, 2D: warped honeycomb, pointy-top cells, 1.8 mm struts. <br> ![hex](docs/patterns/hex.png) | **`coral`**, 2D: reaction-diffusion (Turing) labyrinth. <br> ![coral](docs/patterns/coral.png) |
-| **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) | **`gyroid`**, 3D lattice: graded density through the wall, no straight line of sight. <br> ![gyroid](docs/patterns/gyroid.png) |
-| **`diamond`**, 3D lattice: Schwarz diamond, straighter 45° channels. <br> ![diamond](docs/patterns/diamond.png) | |
+| **`hex`**, 2D: warped honeycomb, pointy-top cells, 1.8 mm struts. <br> ![hex](docs/patterns/hex.png) | **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) |
+| **`gyroid`**, 3D lattice: graded density through the wall, no straight line of sight. <br> ![gyroid](docs/patterns/gyroid.png) | **`diamond`**, 3D lattice: Schwarz diamond, straighter 45° channels. <br> ![diamond](docs/patterns/diamond.png) |
 
 2D patterns are cut radially through the wall; 3D lattices are
-tortuous channels. All wrap seamlessly around the pot. `coral` generates
-its texture on first use at each height (slow) and caches it in
-`~/.cache/pots` (or `$POTS_CACHE_DIR`).
+tortuous channels. All wrap seamlessly around the pot.
 
 ### Regenerating the gallery
 
@@ -184,7 +181,6 @@ src/pots/
   config/       Hydra config: config.yaml and the quality/ and size/ presets
   geometry.py   Pot: all dimensions, scaled from the height
   patterns.py   wall patterns (PATTERNS registry)
-  coral.py      reaction-diffusion texture for `coral`, with its disk cache
   field.py      make_field(): wall + rim + base + cup as one implicit field
   sdf.py        field helpers (smin, cylindrical gyroid)
   mesh.py       slab-wise marching cubes, decimation and repair

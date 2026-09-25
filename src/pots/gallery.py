@@ -6,7 +6,7 @@ docs/patterns/<name>.png: the pot from outside and a 40 x 30 mm true-scale
 swatch of the outer wall face with its open %. No STL, 3MF or config is
 written; use `pots pattern=<name>` for those. Patterns are built one after
 another (never in parallel: memory), well under a minute each at the default
-quality; coral is slow on its first run at a new height.
+quality.
 
 Usage
     pots-gallery                         # every pattern -> docs/patterns/<name>.png

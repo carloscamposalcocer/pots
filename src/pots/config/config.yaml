@@ -26,8 +26,6 @@ defaults:
 #                  best air/soil balance). Strut widths: design.strut_*.
 #   voronoi        same organic cells, straight holes (1.8 mm struts).
 #   hex            warped honeycomb, pointy-top cells (1.8 mm struts).
-#   coral          reaction-diffusion (Turing) labyrinth. First run at a
-#                  new height is slow (texture is generated, then cached).
 #   slots          narrow wavy vertical slots, air-pruning style.
 #   gyroid         3D lattice, no straight line of sight through the wall.
 #   diamond        3D lattice, straighter 45-degree channels.
