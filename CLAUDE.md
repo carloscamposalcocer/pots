@@ -3,8 +3,8 @@
 3D-printable plant pot, continued from an earlier Claude session. It is an installable package in `src/pots/` with a `pots` console script. Read geometry.py, patterns.py, field.py and cli.py before changing anything. Run `uv run pytest` (~15 s) and `uv run pots quality=draft` to confirm everything works (the system `python` lacks the deps; they are in pyproject.toml / uv.lock).
 
 ## Settings (Hydra)
-- User settings live in `src/pots/conf/config.yaml` (+ `quality/{full,draft}.yaml`), shipped inside the package: pattern, height, preview, out, quality (voxel, faces), design (wall, rim, base, cup_wall, strut_in, strut_out). Keep it to user-facing knobs; internal constants (cell counts, jitter, warps) stay in code.
-- Override as `key=value`: `pots height=65 quality=draft design.wall=4`. `--show` prints the resolved config, `-v` = debug logs. Each run saves the resolved `config.yaml` into its `out` dir.
+- User settings live in `src/pots/conf/config.yaml` (+ `quality/{full,draft}.yaml` and `size/{big,small}.yaml`), shipped inside the package: pattern, height, preview, out, quality (voxel, faces), design (wall, rim, base, cup_wall, strut_in, strut_out). Keep it to user-facing knobs; internal constants (cell counts, jitter, warps) stay in code.
+- Override as `key=value`: `pots size=big quality=draft design.wall=5`. The size presets are `@package _global_` and set `height` + `design.wall` (big: 130 mm / 6 mm, small: 50 mm / 4 mm, default small); config.yaml is listed first in its defaults list (`_self_` first) so the preset overrides it, and command-line values override both. `--show` prints the resolved config, `-v` = debug logs. Each run saves the resolved `config.yaml` into its `out` dir.
 - cli.py uses Hydra's compose API (`initialize_config_dir` on the packaged conf/), not `@hydra.main`: hydra-core 1.3.7 (latest stable) crashes in argparse on Python 3.14. `pot_from_config()` turns `height` + `design.*` into a `Pot` (the design keys are exactly the `Pot` field names).
 
 ## Goal

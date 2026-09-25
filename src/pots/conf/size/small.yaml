@@ -1,0 +1,16 @@
+# @package _global_
+# Small pot: 50 mm tall, about 62 mm wide with the cup. Select with
+# size=small (the default). Any value here can still be overridden,
+# e.g. size=small height=65.
+
+# height (mm): overall pot height. Drives the whole shape: the radii,
+# the cup height, the moat gap and the number of cells around the pot
+# all scale by height / 130, so the proportions stay the same. The
+# design sizes and the hole size do NOT scale.
+# Minimum: base + rim + 10 mm (17.4 mm with the defaults).
+height: 50
+
+design:
+  # Pot wall thickness (mm), measured radially. The pattern goes through
+  # it. 6 mm looks chunky on a small pot; 4 mm is fine here.
+  wall: 4.0

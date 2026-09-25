@@ -3,16 +3,21 @@
 #
 # Every value here is a default: override any of them on the command
 # line with key=value, no need to edit this file.
-#   pots height=65 quality=draft
-#   pots pattern=coral design.wall=4
-#   pots --show          # print the final settings, no build
+#   pots size=big                  # the 130 mm reference pot
+#   pots size=small quality=draft  # the 50 mm pot, fast check
+#   pots size=big height=100       # start from a preset, change one value
+#   pots --show                    # print the final settings, no build
 # See README.md for the full description of each parameter.
 # =====================================================================
 
 defaults:
+  # This file first, so the size preset below can override it.
+  - _self_
   # Mesh quality preset: `full` or `draft` (files in conf/quality/).
   - quality: full
-  - _self_
+  # Pot size preset: `big` (130 mm) or `small` (50 mm), files in
+  # conf/size/. Sets `height` and `design.wall`.
+  - size: small
 
 # ---------------------------------------------------------------------
 # pattern: the perforation/lattice used for the pot wall.
@@ -29,16 +34,7 @@ defaults:
 # ---------------------------------------------------------------------
 pattern: voronoi_taper
 
-# ---------------------------------------------------------------------
-# height (mm): overall pot height. Drives the whole shape: the radii,
-# the cup height, the moat gap and the number of cells around the pot
-# all scale by height / 130, so the proportions stay the same.
-#   130 -> reference pot, 151 mm wide (outer radius 56 -> 72 mm)
-#    65 -> half size, about 78 mm wide
-# The `design` sizes below and the hole size do NOT scale.
-# Minimum: base + rim + 10 mm (17.4 mm with the defaults).
-# ---------------------------------------------------------------------
-height: 50
+# height (mm) comes from the size preset (conf/size/); see there.
 
 # preview: also render a PNG (outside view, cut-away, vertical section,
 # and both wall faces at true scale with their open %). Costs ~10 s.
@@ -55,10 +51,7 @@ out: output/${pattern}_h${height}
 # soil, not on how big the pot is.
 # ---------------------------------------------------------------------
 design:
-  # Pot wall thickness, measured radially. The pattern goes through it.
-  # Thicker = stiffer and longer funnels; thinner = lighter, more open
-  # looking. Small pots look chunky at 6 mm; 4 mm is fine there.
-  wall: 4.0
+  # wall (pot wall thickness) comes from the size preset (conf/size/).
 
   # Solid band at the top of the pot (no holes). Gives the rim its
   # stiffness and a clean edge to hold.

@@ -1,0 +1,16 @@
+# @package _global_
+# Big pot: the 130 mm reference shape, 151 mm wide. Select with size=big.
+# Any value here can still be overridden, e.g. size=big height=110.
+
+# height (mm): overall pot height. Drives the whole shape: the radii,
+# the cup height, the moat gap and the number of cells around the pot
+# all scale by height / 130, so the proportions stay the same. The
+# design sizes and the hole size do NOT scale.
+# Minimum: base + rim + 10 mm (17.4 mm with the defaults).
+height: 130
+
+design:
+  # Pot wall thickness (mm), measured radially. The pattern goes through
+  # it. Thicker = stiffer and longer funnels; thinner = lighter, more open
+  # looking. 6 mm gives a stiff wall at this size.
+  wall: 6.0

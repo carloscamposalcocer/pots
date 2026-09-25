@@ -5,9 +5,10 @@ Every setting has a default in the packaged conf/config.yaml; pass only what
 you change, as key=value (Hydra syntax, nested keys use dots).
 
 Examples
-    pots                              # build with the config defaults
-    pots quality=draft                # fast low-res check
-    pots height=65                    # half-size pot, same shape
+    pots                              # build with the config defaults (size=small)
+    pots size=big                     # the 130 mm reference pot
+    pots size=small quality=draft     # fast low-res check of the 50 mm pot
+    pots size=big height=100          # start from a preset, change one value
     pots pattern=coral                # another pattern
     pots design.wall=4                # thinner wall (mm, does not scale)
     pots height=65 --show             # print the resolved settings, don't build

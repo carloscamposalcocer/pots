@@ -24,9 +24,10 @@ All settings live in [`src/pots/conf/config.yaml`](src/pots/conf/config.yaml)
 and have defaults. Override only what you want to change, as `key=value`:
 
 ```sh
-pots                                  # build with the config defaults
-pots quality=draft                    # fast low-res check
-pots height=65                        # half-size pot, same shape
+pots                                  # build with the config defaults (size=small)
+pots size=big                         # the 130 mm reference pot
+pots size=small quality=draft         # fast low-res check of the 50 mm pot
+pots size=big height=100              # start from a preset, change one value
 pots pattern=coral design.wall=4      # another pattern, thinner wall
 pots height=65 --show                 # print the final settings, don't build
 pots -v                               # debug logging
@@ -54,13 +55,22 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 | Key | Default | Description |
 |---|---|---|
 | `pattern` | `voronoi_taper` | Wall pattern, see [Patterns](#patterns). |
-| `height` | `130`* | Pot height in mm. **Drives the whole shape**, see [Scaling](#scaling-with-height). Minimum `base + rim + 10` (17.4 mm). |
+| `size` | `small` | Size preset: `big` or `small`, see [Size presets](#size-presets-srcpotsconfsize). |
+| `height` | from `size` | Pot height in mm. **Drives the whole shape**, see [Scaling](#scaling-with-height). Minimum `base + rim + 10` (17.4 mm). |
 | `preview` | `true` | Also render the PNG preview (~10 s). |
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `full` | Mesh quality preset: `full` or `draft`. |
 
-\* The reference shape is 130 mm; `config.yaml` may currently hold a
-different working value.
+### Size presets (`src/pots/conf/size/`)
+
+Each preset sets the height and the wall thickness. Anything on the
+command line still wins, so `size=big height=110` is a big pot made
+110 mm tall.
+
+| Key | `big` | `small` |
+|---|---|---|
+| `height` | 130 (151 mm wide) | 50 (~62 mm wide with the cup) |
+| `design.wall` | 6.0 | 4.0 |
 
 ### Quality presets (`src/pots/conf/quality/`)
 
@@ -78,7 +88,7 @@ pot size, so they **do not scale** with `height`.
 
 | Key | Default | Description |
 |---|---|---|
-| `design.wall` | 6.0 | Pot wall thickness (radial). The pattern goes through it. Thicker = stiffer, longer funnels; thinner = lighter. 4 mm suits small pots. |
+| `design.wall` | from `size` | Pot wall thickness (radial). The pattern goes through it. Thicker = stiffer, longer funnels; thinner = lighter. 4 mm suits small pots. |
 | `design.rim` | 5.0 | Solid band at the top, for stiffness and a clean edge. |
 | `design.base` | 2.4 | Solid floor shared by pot and cup. The soil sits on it and wicks water from the cup. The pattern starts 1 mm above it. |
 | `design.cup_wall` | 2.4 | Wall thickness of the drip cup. |
