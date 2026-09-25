@@ -3,6 +3,18 @@ import pytest
 
 from pots import PATTERNS, Pot, make_field
 from pots.metrics import face_window, wall_metrics
+from pots.patterns import load_params
+
+
+def reference_params():
+    """The pattern settings with the tapered struts at the reference 2.2 / 1.1 mm,
+    so the metric tests check the pattern shapes, not the struts tuned in
+    patterns.yaml."""
+    P = load_params()
+    for c in vars(P).values():
+        if hasattr(c, "strut_in"):
+            c.strut_in, c.strut_out = 2.2, 1.1
+    return P
 
 
 def ring(pot, frac, z, th):
@@ -55,7 +67,7 @@ def test_flat_bottom(name):
 @pytest.mark.parametrize("name", ["voronoi_taper", "hex_taper", "drops", "lattice_taper"])
 def test_tapered_patterns_open_outward(name):
     pot = Pot()
-    m = wall_metrics(make_field(pot, name), pot, face_window(pot, 40, 30))
+    m = wall_metrics(make_field(pot, name, reference_params()), pot, face_window(pot, 40, 30))
     assert m.outer_open > m.inner_open > 0.15
     assert m.outer_hole > m.inner_hole
     assert 2.0 < m.inner_hole < 5.0
@@ -64,7 +76,7 @@ def test_tapered_patterns_open_outward(name):
 @pytest.mark.parametrize("name", [n for n, p in PATTERNS.items() if p.kind == "2d"])
 def test_2d_patterns_are_open_but_hold_soil(name):
     pot = Pot(height=65, wall=4.0)
-    m = wall_metrics(make_field(pot, name), pot, face_window(pot, 30, 25))
+    m = wall_metrics(make_field(pot, name, reference_params()), pot, face_window(pot, 30, 25))
     assert m.outer_open > 0.15 and m.inner_open > 0.15
     assert m.outer_hole < 5.5 and m.inner_hole < 5.5
 

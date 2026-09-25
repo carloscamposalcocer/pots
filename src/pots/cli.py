@@ -5,16 +5,16 @@ Every setting has a default in the packaged config/config.yaml; pass only what
 you change, as key=value (Hydra syntax, nested keys use dots).
 
 Examples
-    pots                              # build with the config defaults (size=small)
+    pots                              # quick draft build with the defaults (size=small)
+    pots quality=full                 # print-quality mesh (the file you print)
     pots size=big                     # the 130 mm reference pot
-    pots size=small quality=draft     # fast low-res check of the 50 mm pot
     pots size=big height=100          # start from a preset, change one value
     pots pattern=hex                  # another pattern
     pots design.wall=4                # thinner wall (mm, does not scale)
     pots pattern=lattice_taper patterns.lattice_taper.strut_in=2.5
                                       # a pattern setting (config/patterns.yaml)
     pots height=65 --show             # print the resolved settings, don't build
-    pots --all quality=draft          # every pattern, one after another
+    pots --all                        # every pattern, one after another
     pots -v                           # debug logging (per-slab marching cubes)
 
 Options

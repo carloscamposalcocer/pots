@@ -4,7 +4,7 @@
 # Every value here is a default: override any of them on the command
 # line with key=value, no need to edit this file.
 #   pots size=big                  # the 130 mm reference pot
-#   pots size=small quality=draft  # the 50 mm pot, fast check
+#   pots quality=full              # print-quality mesh (default: draft)
 #   pots size=big height=100       # start from a preset, change one value
 #   pots --show                    # print the final settings, no build
 # See README.md for the full description of each parameter.
@@ -13,7 +13,8 @@
 defaults:
   # This file first, so the size preset below can override it.
   - _self_
-  # Mesh quality preset: `full` or `draft` (files in config/quality/).
+  # Mesh quality preset: `draft` (default, fast check, too coarse to
+  # print) or `full` (the file you print). Files in config/quality/.
   - quality: draft
   # Pot size preset: `big` (130 mm) or `small` (50 mm), files in
   # config/size/. Sets `height` and `design.wall`.

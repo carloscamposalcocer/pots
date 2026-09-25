@@ -1,5 +1,6 @@
 # Quick low-res test, to check a shape or setting before a full build.
-# Select with quality=draft. Not meant for printing: struts are coarse.
+# The default (quality=draft). Not meant for printing: struts are
+# coarse; use quality=full for the file you print.
 
 # voxel (mm): mesh grid spacing (see full.yaml). 0.6 has 8x fewer voxels
 # than 0.3: about 1 min for a 130 mm pot.

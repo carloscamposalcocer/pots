@@ -6,15 +6,15 @@ from pots.patterns import PATTERNS
 
 def test_defaults_compose():
     cfg = load_config([])
-    assert cfg.quality.voxel == 0.3
+    assert cfg.quality.voxel == 0.6      # draft by default
     assert cfg.out == f"output/{cfg.pattern}_h{cfg.height}"
 
 
 def test_overrides():
-    cfg = load_config(["height=65", "quality=draft", "design.wall=3.5"])
+    cfg = load_config(["height=65", "quality=full", "design.wall=3.5"])
     pot = pot_from_config(cfg)
     assert (pot.height, pot.wall) == (65, 3.5)
-    assert cfg.quality.voxel == 0.6
+    assert cfg.quality.voxel == 0.3
 
 
 def test_bad_values():

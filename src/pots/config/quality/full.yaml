@@ -1,4 +1,4 @@
-# Final print quality. Select with quality=full (the default).
+# Final print quality. Select with quality=full (the default is draft).
 
 # voxel (mm): grid spacing of the marching-cubes mesh. Smaller = finer
 # detail, but time and memory grow ~1/voxel^3. At 0.3 mm a 130 mm pot

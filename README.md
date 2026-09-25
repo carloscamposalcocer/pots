@@ -24,13 +24,13 @@ All settings live in [`src/pots/config/config.yaml`](src/pots/config/config.yaml
 and have defaults. Override only what you want to change, as `key=value`:
 
 ```sh
-pots                                  # build with the config defaults (size=small)
+pots                                  # quick draft build with the defaults (size=small)
+pots quality=full                     # print-quality mesh, use this for the file you print
 pots size=big                         # the 130 mm reference pot
-pots size=small quality=draft         # fast low-res check of the 50 mm pot
 pots size=big height=100              # start from a preset, change one value
 pots pattern=hex design.wall=4        # another pattern, thinner wall
 pots height=65 --show                 # print the final settings, don't build
-pots --all quality=draft              # every pattern, one after another
+pots --all                            # every pattern, one after another
 pots -v                               # debug logging
 pots --help                           # usage and the list of patterns
 ```
@@ -60,7 +60,7 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 | `height` | from `size` | Pot height in mm. **Drives the whole shape**, see [Scaling](#scaling-with-height). Minimum `base + rim + 10` (17.4 mm). |
 | `preview` | `true` | Also render the PNG preview (~10 s). |
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
-| `quality` | `full` | Mesh quality preset: `full` or `draft`. |
+| `quality` | `draft` | Mesh quality preset: `draft` (fast check) or `full` (for printing). |
 
 ### Size presets (`src/pots/config/size/`)
 
@@ -80,7 +80,9 @@ command line still wins, so `size=big height=110` is a big pot made
 | `quality.voxel` | 0.3 | 0.6 | Mesh grid spacing in mm. Time and memory grow ~1/voxel³: full at 130 mm takes ~2–3 min and 2–3 GB RAM, draft ~1 min. Don't run several full builds in parallel. |
 | `quality.faces` | 900 000 | 100 000 | Triangle budget; the mesh is decimated to this. |
 
-You can also override a single value: `quality=draft quality.voxel=0.45`.
+The default is `draft`, which is too coarse to print: build the final file
+with `quality=full`. You can also override a single value:
+`quality=full quality.voxel=0.4`.
 
 ### Design sizes (`design.*`, mm)
 
