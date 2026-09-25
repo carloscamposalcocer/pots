@@ -40,6 +40,7 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
   - metrics.py: `wall_metrics(field, pot)`: open %, median hole diameter, straight-through % of both wall faces (logged on every build).
   - preview.py: matplotlib PNG (outside, cut-away, section, both wall faces with open %).
   - cli.py: the `pots` command; exports STL + 3MF + PNG + resolved config.yaml.
+  - gallery.py: the `pots-gallery` command; builds every pattern in memory (sequentially) and saves only `preview.render_card` images to docs/patterns/<name>.png, which the README Patterns section shows. Rerun it after changing a pattern.
 - tests/: pytest; geometry scaling, seamlessness at theta = ±pi for every pattern, solid base/rim/cup, voronoi_taper metrics, a small draft build (watertight, 1 body), CLI config handling.
 - The old two-piece pot (pot_v2 pot_field/cup_field) and the standalone scripts were removed in the src/ refactor; they are in git history before that commit.
 

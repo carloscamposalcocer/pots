@@ -14,7 +14,7 @@ cubes) and exported as STL + 3MF, with a PNG preview.
 uv sync                      # or: pip install -e .
 ```
 
-This installs the `pots` command into the project venv. Run it with
+This installs the `pots` and `pots-gallery` commands into the project venv. Run them with
 `uv run pots ...`, or activate the venv and call `pots` directly
 (`python -m pots` works too).
 
@@ -115,18 +115,41 @@ same-size holes and a proportionally thicker wall.
 
 ## Patterns
 
-| Name | Type | Description |
-|---|---|---|
-| `voronoi_taper` | 2D, tapered | Organic cells that flare outward like funnels. Default. |
-| `voronoi` | 2D | Same cells, straight-through holes, 1.8 mm struts. |
-| `hex` | 2D | Warped honeycomb, pointy-top cells, 1.8 mm struts. |
-| `coral` | 2D | Reaction-diffusion (Turing) labyrinth. Its texture is generated on first use at each height (slow) and cached in `~/.cache/pots` (or `$POTS_CACHE_DIR`). |
-| `slots` | 2D | Narrow wavy vertical slots, air-pruning style. |
-| `gyroid` | 3D lattice | Graded density through the wall, no straight line of sight. |
-| `diamond` | 3D lattice | Schwarz diamond, straighter 45° channels. |
+Pick one with `pattern=<name>`. Each image shows the 50 mm pot (`size=small`)
+from outside, next to a 40 x 30 mm true-scale swatch of the outer wall face
+(white = open) with its open %.
+
+| | |
+|---|---|
+| **`voronoi_taper`** (default), 2D, tapered: organic cells that flare outward like funnels. <br> ![voronoi_taper](docs/patterns/voronoi_taper.png) | **`voronoi`**, 2D: the same cells with straight-through holes and 1.8 mm struts. <br> ![voronoi](docs/patterns/voronoi.png) |
+| **`hex`**, 2D: warped honeycomb, pointy-top cells, 1.8 mm struts. <br> ![hex](docs/patterns/hex.png) | **`coral`**, 2D: reaction-diffusion (Turing) labyrinth. <br> ![coral](docs/patterns/coral.png) |
+| **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) | **`gyroid`**, 3D lattice: graded density through the wall, no straight line of sight. <br> ![gyroid](docs/patterns/gyroid.png) |
+| **`diamond`**, 3D lattice: Schwarz diamond, straighter 45° channels. <br> ![diamond](docs/patterns/diamond.png) | |
 
 2D patterns are cut radially through the wall; 3D lattices are
-tortuous channels. All wrap seamlessly around the pot.
+tortuous channels. All wrap seamlessly around the pot. `coral` generates
+its texture on first use at each height (slow) and caches it in
+`~/.cache/pots` (or `$POTS_CACHE_DIR`).
+
+### Regenerating the gallery
+
+`pots-gallery` builds every pattern one after another, in memory, and
+writes only these images to `docs/patterns/<name>.png` (no STL, 3MF or
+config; use `pots pattern=<name>` for a printable pot).
+
+```sh
+pots-gallery                          # every pattern (a few minutes in total)
+pots-gallery hex slots                # only these
+pots-gallery quality=draft            # faster, coarser
+pots-gallery size=big --images pics   # the 130 mm pot, images in pics/
+pots-gallery height=90 design.wall=5  # any shape setting of `pots`
+```
+
+It takes the shape settings of `pots` (`size`, `height`, `design.*`,
+`quality`). Mesh quality defaults to `quality.voxel=0.35
+quality.faces=400000` (between draft and full, fine enough for the 1.1 mm
+struts to show); any `quality=...` or `quality.*` on the command line
+replaces that. Run it after changing a pattern so the README stays current.
 
 ## Printability rules
 
@@ -157,7 +180,8 @@ print(wall_metrics(field, pot))                # open %, hole size on both faces
 ```
 src/pots/
   cli.py        `pots` command: config, build, export, preview
-  conf/         Hydra config: config.yaml and the quality/ presets
+  gallery.py    `pots-gallery` command: every pattern + README images
+  conf/         Hydra config: config.yaml and the quality/ and size/ presets
   geometry.py   Pot: all dimensions, scaled from the height
   patterns.py   wall patterns (PATTERNS registry)
   coral.py      reaction-diffusion texture for `coral`, with its disk cache
@@ -166,8 +190,9 @@ src/pots/
   mesh.py       slab-wise marching cubes, decimation and repair
   pipeline.py   generate(): field -> clean, watertight mesh
   metrics.py    open %, hole size and straight-through % of both wall faces
-  preview.py    PNG preview
+  preview.py    PNG preview and the small gallery image
 tests/          pytest suite (uv run pytest)
+docs/patterns/  gallery images used in this README (pots-gallery)
 ```
 
 The model is an implicit field (negative = solid), meshed with marching

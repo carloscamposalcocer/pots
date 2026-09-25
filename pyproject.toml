@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 pots = "pots.cli:main"
+pots-gallery = "pots.gallery:main"
 
 [dependency-groups]
 dev = [
