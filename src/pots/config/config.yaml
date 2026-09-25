@@ -26,9 +26,19 @@ defaults:
 #                  best air/soil balance). Strut widths: design.strut_*.
 #   voronoi        same organic cells, straight holes (1.8 mm struts).
 #   hex            warped honeycomb, pointy-top cells (1.8 mm struts).
+#   hex_taper      the honeycomb flaring outward like voronoi_taper.
+#   drops          staggered teardrops flaring outward like voronoi_taper.
+#   lattice        diamond trellis of crossing helical strips.
+#   isogrid        triangle grid.
+#   louvers        gills sloping down and out: no line of sight, soil
+#                  stays in, rain runs off.
 #   slots          narrow wavy vertical slots, air-pruning style.
+#   spiral         slots on a many-start helix.
+#   chevrons       stacked arrowhead slots.
+#   bands          air-pruning slots at the base, voronoi_taper above.
 #   gyroid         3D lattice, no straight line of sight through the wall.
 #   diamond        3D lattice, straighter 45-degree channels.
+#   weave          3D: strips woven over and under through the wall.
 # ---------------------------------------------------------------------
 pattern: voronoi_taper
 

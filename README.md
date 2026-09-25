@@ -122,11 +122,19 @@ from outside, next to a 40 x 30 mm true-scale swatch of the outer wall face
 | | |
 |---|---|
 | **`voronoi_taper`** (default), 2D, tapered: organic cells that flare outward like funnels. <br> ![voronoi_taper](docs/patterns/voronoi_taper.png) | **`voronoi`**, 2D: the same cells with straight-through holes and 1.8 mm struts. <br> ![voronoi](docs/patterns/voronoi.png) |
-| **`hex`**, 2D: warped honeycomb, pointy-top cells, 1.8 mm struts. <br> ![hex](docs/patterns/hex.png) | **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) |
+| **`hex`**, 2D: warped honeycomb, pointy-top cells, 1.8 mm struts. <br> ![hex](docs/patterns/hex.png) | **`hex_taper`**, 2D, tapered: the honeycomb flaring outward like `voronoi_taper`. <br> ![hex_taper](docs/patterns/hex_taper.png) |
+| **`drops`**, 2D, tapered: staggered teardrops with 55° pointed tops, flaring outward. <br> ![drops](docs/patterns/drops.png) | **`lattice`**, 2D: diamond trellis of helical strips crossing at ±55°, no bridges at all. <br> ![lattice](docs/patterns/lattice.png) |
+| **`isogrid`**, 2D: triangle grid; the downward triangles have short flat bridges. <br> ![isogrid](docs/patterns/isogrid.png) | **`louvers`**, 2D: gills that run down and outward through the wall like shutter blades. No line of sight: soil stays in, rain runs off. <br> ![louvers](docs/patterns/louvers.png) |
+| **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) | **`spiral`**, 2D: slots on a many-start 60° helix. <br> ![spiral](docs/patterns/spiral.png) |
+| **`chevrons`**, 2D: stacked arrowhead slots. <br> ![chevrons](docs/patterns/chevrons.png) | **`bands`**, 2D: a row of air-pruning slots at the base, `voronoi_taper` above. <br> ![bands](docs/patterns/bands.png) |
 | **`gyroid`**, 3D lattice: graded density through the wall, no straight line of sight. <br> ![gyroid](docs/patterns/gyroid.png) | **`diamond`**, 3D lattice: Schwarz diamond, straighter 45° channels. <br> ![diamond](docs/patterns/diamond.png) |
+| **`weave`**, 3D: two sets of strips woven over and under through the wall (the swatch shows only where they touch the outer face). <br> ![weave](docs/patterns/weave.png) | |
 
-2D patterns are cut radially through the wall; 3D lattices are
-tortuous channels. All wrap seamlessly around the pot.
+2D patterns are cut radially through the wall (louvers slope down through
+it); 3D lattices are tortuous channels. All wrap seamlessly around the pot.
+Sloped hole roofs are at least 55° from horizontal in the unrolled pattern,
+so at least 45° on the real, tapered pot, and no hole closes into a loop,
+so the wall is always one piece.
 
 ### Regenerating the gallery
 
@@ -204,5 +212,6 @@ The `key=value` syntax is the same; `--show` replaces `--cfg job`.
 
 ```sh
 uv sync            # installs the dev group (pytest) too
-uv run pytest      # ~15 s, includes a small draft build
+uv run pytest      # ~30 s, includes a small draft build
+uv run pytest -m slow   # ~2 min: builds every pattern, checks for loose parts and overhangs
 ```

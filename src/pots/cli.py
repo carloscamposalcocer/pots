@@ -80,7 +80,7 @@ def setup_logging(verbose):
 def run(cfg):
     from omegaconf import OmegaConf
 
-    from .metrics import wall_metrics
+    from .metrics import overhang_share, wall_metrics
     from .pipeline import generate
     from .preview import render
 
@@ -106,6 +106,7 @@ def run(cfg):
     if not m.is_watertight or m.body_count != 1:
         log.warning("mesh is not a single watertight body; check it before printing")
     log.info("wall  %s", wall_metrics(field, pot))
+    log.info("overhangs past 50 degrees (not bridges): %.1f%% of the surface", 100 * overhang_share(m))
     log.info("[2/3] exporting %s.stl and %s.3mf", base, base)
     m.export(base.with_suffix(".stl")); m.export(base.with_suffix(".3mf"))
     outs = [base.with_suffix(".stl"), base.with_suffix(".3mf")]

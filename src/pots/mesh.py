@@ -8,6 +8,7 @@ import trimesh
 log = logging.getLogger(__name__)
 
 SLAB = 24             # z layers per marching-cubes slab (bounds peak memory)
+DETACHED = 0.01       # warn when clean() drops more than this share of the faces
 
 
 def build(field, rmax, zmax, vox):
@@ -78,8 +79,13 @@ def clean(mesh, target_faces):
     else:
         log.info("skipping decimation (%s faces <= budget %s)", f"{n0:,}", f"{target_faces:,}")
     parts = mesh.split(only_watertight=False)
+    n_all = sum(len(p.faces) for p in parts)
     mesh = max(parts, key=lambda p: len(p.faces))
     log.info("kept largest of %d components (%s faces)", len(parts), f"{len(mesh.faces):,}")
+    dropped = 1 - len(mesh.faces) / n_all
+    if dropped > DETACHED:
+        log.warning("dropped %d detached pieces (%.0f%% of the faces): the wall pattern "
+                    "has loose parts, so the printed wall will have gaps", len(parts) - 1, 100 * dropped)
     log.info("repairing mesh")
     fix = pymeshfix.MeshFix(mesh.vertices, mesh.faces)
     fix.repair(joincomp=False, remove_smallest_components=True)

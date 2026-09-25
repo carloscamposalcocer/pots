@@ -1,6 +1,6 @@
 # Plant Pot Project
 
-3D-printable plant pot, continued from an earlier Claude session. It is an installable package in `src/pots/` with a `pots` console script. Read geometry.py, patterns.py, field.py and cli.py before changing anything. Run `uv run pytest` (~15 s) and `uv run pots quality=draft` to confirm everything works (the system `python` lacks the deps; they are in pyproject.toml / uv.lock).
+3D-printable plant pot, continued from an earlier Claude session. It is an installable package in `src/pots/` with a `pots` console script. Read geometry.py, patterns.py, field.py and cli.py before changing anything. Run `uv run pytest` (~30 s; `-m slow` builds every pattern, ~2 min) and `uv run pots quality=draft` to confirm everything works (the system `python` lacks the deps; they are in pyproject.toml / uv.lock).
 
 ## Settings (Hydra)
 - User settings live in `src/pots/config/config.yaml` (+ `quality/{full,draft}.yaml` and `size/{big,small}.yaml`), shipped inside the package: pattern, height, preview, out, quality (voxel, faces), design (wall, rim, base, cup_wall, strut_in, strut_out). Keep it to user-facing knobs; internal constants (cell counts, jitter, warps) stay in code.
@@ -31,21 +31,21 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
 ## Code architecture
 - `src/pots/`:
   - geometry.py: `Pot` (all dimensions, derived ones as cached properties; r_out/r_in/cup_ri) and the reference constants (H_REF, radii, cup, LIP, CHAMFER).
-  - patterns.py: `PATTERNS` registry of `Pattern(kind, fn, description)`; each pattern is `fn(pot, th, Z, r, s)`. Kinds: "3d" lattices (gyroid, diamond; graded density through the wall; field = material) and "2d" radial perforations (voronoi, voronoi_taper, hex, slots; field = hole). Unrolled coordinates use `pot.r0` (64 mm at H_REF).
+  - patterns.py: `PATTERNS` registry of `Pattern(kind, fn, description)`; each pattern is `fn(pot, th, Z, r, s)`. Kinds: "3d" lattices (gyroid, diamond, weave; field = material) and "2d" perforations (voronoi, voronoi_taper, hex, hex_taper, drops, lattice, isogrid, louvers, slots, spiral, chevrons, bands; field = hole). Sloped roofs are drawn at SLOPE = 55 deg in the unrolled plane, so they stay >= 45 deg on the tapered pot (r/r0 is 0.875 to 1.125). The tapered ones (voronoi_taper, hex_taper, drops) shift the pattern down by recession / (vertical part of the roof normal). Unrolled coordinates use `pot.r0` (64 mm at H_REF).
   - field.py: `make_field(pot, pattern)` assembles lattice wall + rim + base + cup.
   - sdf.py: smin, cylindrical(), gyroid(), CELL, T_IN/T_OUT.
   - mesh.py: `build()` = skimage marching_cubes in z-slabs. Slab vertices stay in index space until after merge_vertices, then get scaled. That is what makes the slab seams watertight; don't change it. `clean()` = fast_simplification decimation, keep the largest component, pymeshfix, fix_normals, drop to z=0.
   - pipeline.py: `generate(pot, pattern, voxel, faces)` -> (mesh, field).
-  - metrics.py: `wall_metrics(field, pot)`: open %, median hole diameter, straight-through % of both wall faces (logged on every build).
+  - metrics.py: `wall_metrics(field, pot)`: open %, median hole diameter of both wall faces, and straight-through % (open at 5 depths along the same radial ray); `overhang_share(mesh)`: share of the surface facing down more than 50 deg from vertical, not counting level bridges or the bed face. Both are logged on every build.
   - preview.py: matplotlib PNG (outside, cut-away, section, both wall faces with open %).
   - cli.py: the `pots` command; exports STL + 3MF + PNG + resolved config.yaml.
   - gallery.py: the `pots-gallery` command; builds every pattern in memory (sequentially) and saves only `preview.render_card` images to docs/patterns/<name>.png, which the README Patterns section shows. Rerun it after changing a pattern.
-- tests/: pytest; geometry scaling, seamlessness at theta = ±pi for every pattern, solid base/rim/cup, voronoi_taper metrics, a small draft build (watertight, 1 body), CLI config handling.
+- tests/: pytest; geometry scaling, seamlessness at theta = ±pi for every pattern, solid base/rim/cup, tapered-pattern and soil-holding metrics, louvers line of sight, a small draft build (watertight, 1 body), CLI config handling. `-m slow`: a draft build of every pattern with no loose parts and overhang share < 12%.
 - The old two-piece pot (pot_v2 pot_field/cup_field) and the standalone scripts were removed in the src/ refactor; they are in git history before that commit.
 
 ## Gotchas
 - A full-res build (voxel 0.3) takes about 2 to 3 minutes and needs 2 to 3 GB RAM. Don't run several builds in parallel; it ran out of memory before.
-- Tiny floating specks come out of marching cubes. clean() removes them; always check that the mesh is watertight and has 1 body (the build log reports both and warns otherwise).
+- Tiny floating specks come out of marching cubes. clean() removes them; always check that the mesh is watertight and has 1 body (the build log reports both and warns otherwise). clean() keeps only the largest piece, so a pattern whose holes close into loops loses whole islands silently; it now warns ("dropped N detached pieces") when over 1% of the faces go. That is why `coral` was removed.
 - To check a pattern, use `pots.metrics.wall_metrics(field, pot)`: it samples the outer face (frac 0.02) and the inner face (frac 0.98) at theta = arc / r_out(z), so the rays are radial, and reports open %, median hole diameter (distance transform) and straight-through %.
 
 ## Possible next steps (not decided)

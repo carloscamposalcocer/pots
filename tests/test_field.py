@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from pots import PATTERNS, Pot, make_field
-from pots.metrics import wall_metrics
+from pots.metrics import face_window, wall_metrics
 
 
 def ring(pot, frac, z, th):
@@ -52,9 +52,25 @@ def test_flat_bottom(name):
     assert (f(r, y, np.full_like(r, 0.05)) < 0).all()
 
 
-def test_voronoi_taper_opens_outward():
+@pytest.mark.parametrize("name", ["voronoi_taper", "hex_taper", "drops"])
+def test_tapered_patterns_open_outward(name):
     pot = Pot()
-    m = wall_metrics(make_field(pot, "voronoi_taper"), pot)
+    m = wall_metrics(make_field(pot, name), pot, face_window(pot, 40, 30))
     assert m.outer_open > m.inner_open > 0.15
     assert m.outer_hole > m.inner_hole
     assert 2.0 < m.inner_hole < 5.0
+
+
+@pytest.mark.parametrize("name", [n for n, p in PATTERNS.items() if p.kind == "2d"])
+def test_2d_patterns_are_open_but_hold_soil(name):
+    pot = Pot(height=65, wall=4.0)
+    m = wall_metrics(make_field(pot, name), pot, face_window(pot, 30, 25))
+    assert m.outer_open > 0.15 and m.inner_open > 0.15
+    assert m.outer_hole < 5.5 and m.inner_hole < 5.5
+
+
+def test_louvers_have_no_line_of_sight():
+    pot = Pot()
+    m = wall_metrics(make_field(pot, "louvers"), pot, face_window(pot, 40, 30))
+    assert m.through < 0.01
+    assert m.outer_open > 0.3

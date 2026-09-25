@@ -55,7 +55,7 @@ class WallMetrics:
     inner_open: float
     outer_hole: float     # median hole diameter (mm)
     inner_hole: float
-    through: float        # fraction open on both faces along the same ray
+    through: float        # fraction open all the way through along the same ray
 
     def __str__(self):
         return (f"outside {self.outer_open:.0%} open, holes ~{self.outer_hole:.1f} mm | "
@@ -63,9 +63,22 @@ class WallMetrics:
                 f"straight-through {self.through:.0%}")
 
 
+def overhang_share(mesh, limit=50.0):
+    """Share of the surface area that faces down more than `limit` degrees
+    from vertical, not counting level bridges (normal within ~14 degrees of
+    straight down) or the face on the build plate. A support-free pot is ~0."""
+    nz = mesh.face_normals[:, 2]
+    area = mesh.area_faces
+    bad = (nz < -np.sin(np.deg2rad(limit))) & (nz > -0.97) & (mesh.triangles_center[:, 2] > 0.5)
+    return float(area[bad].sum() / area.sum())
+
+
 def wall_metrics(field, pot, win=None):
     win = win or face_window(pot)
     out = sample_face(field, pot, OUTER, win)
     inn = sample_face(field, pot, INNER, win)
+    through = out & inn
+    for frac in np.linspace(OUTER, INNER, 5)[1:-1]:   # holes that bend (louvers, lattices) block the ray
+        through &= sample_face(field, pot, frac, win)
     return WallMetrics(out.mean(), inn.mean(), hole_diameter(out, win.px),
-                       hole_diameter(inn, win.px), (out & inn).mean())
+                       hole_diameter(inn, win.px), through.mean())
