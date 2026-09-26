@@ -77,4 +77,15 @@ design:
   # Wall thickness of the plain drip cup around the bottom.
   cup_wall: 2.4
 
+  # Solid layer on the soil side of the wall, behind the pattern (mm).
+  # Where it is, the holes become blind pockets: the pattern still shows
+  # outside, but water poured on the soil can't run out through the wall.
+  # 1.6 mm = 4 perimeters of a 0.4 mm nozzle. 0 = holes go right through.
+  skin: 1.6
+
+  # How much of the pot height, measured from the top, gets the skin
+  # (0 to 1). Below it the holes stay open, for air and so extra water
+  # drains into the cup. 0.67 = the top two thirds are closed.
+  skin_frac: 0.67
+
 # Pattern settings (cell size, strut widths, ...): config/patterns.yaml.

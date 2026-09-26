@@ -33,8 +33,14 @@ class Pot:
     rim: float = 5.0           # solid band at the top
     base: float = 2.4          # solid floor shared by pot and cup
     cup_wall: float = 2.4      # drip cup wall thickness
+    skin: float = 0.0          # solid soil-side layer behind the pattern (0 = holes go through)
+    skin_frac: float = 0.0     # share of the height, from the top, that gets the skin
 
     def __post_init__(self):
+        if not 0 <= self.skin_frac <= 1:
+            raise ValueError("skin_frac must be between 0 and 1")
+        if not 0 <= self.skin < self.wall:
+            raise ValueError("skin must be at least 0 and thinner than the wall")
         if self.height < self.min_height:
             raise ValueError(f"height must be at least {self.min_height:g} mm "
                              "(base + rim + some pattern)")
@@ -70,6 +76,11 @@ class Pot:
     def cup_flare(self):
         # lip just wider than the pot top, so vertical drips land in the cup
         return (self.r_top + LIP) - (self.r_bot + self.cup_gap)
+
+    @cached_property
+    def skin_z(self):
+        """Height above which the soil side of the wall is closed by the skin."""
+        return self.height * (1 - self.skin_frac)
 
     @cached_property
     def r0(self):

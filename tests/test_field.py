@@ -86,3 +86,18 @@ def test_louvers_have_no_line_of_sight():
     m = wall_metrics(make_field(pot, "louvers"), pot, face_window(pot, 40, 30))
     assert m.through < 0.01
     assert m.outer_open > 0.3
+
+
+@pytest.mark.parametrize("name", PATTERNS)
+def test_skin_closes_the_soil_side_only_above_skin_z(name):
+    pot = Pot(height=65, wall=4.0, skin=1.6, skin_frac=0.67)
+    f = make_field(pot, name)
+    th = np.linspace(-np.pi, np.pi, 2000, endpoint=False)
+    top = np.linspace(pot.skin_z + 0.5, pot.height - pot.rim - 0.5, 12)
+    low = np.linspace(pot.base + 2, pot.skin_z - 1, 12)
+    inner_top = np.concatenate([f(*ring(pot, 0.98, z, th)) for z in top])
+    outer_top = np.concatenate([f(*ring(pot, 0.02, z, th)) for z in top])
+    inner_low = np.concatenate([f(*ring(pot, 0.98, z, th)) for z in low])
+    assert (inner_top < 0).all()          # closed skin on the soil side
+    assert (outer_top > 0).any()          # the pattern still shows outside
+    assert (inner_low > 0).any()          # open below the skin

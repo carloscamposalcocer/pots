@@ -95,6 +95,8 @@ pot size, so they **do not scale** with `height`.
 | `design.rim` | 5.0 | Solid band at the top, for stiffness and a clean edge. |
 | `design.base` | 2.4 | Solid floor shared by pot and cup. The soil sits on it and wicks water from the cup. The pattern starts 1 mm above it. |
 | `design.cup_wall` | 2.4 | Wall thickness of the drip cup. |
+| `design.skin` | 1.6 | Solid soil-side layer behind the pattern. Where it is, the holes become blind pockets, so water poured on the soil can't run out through the wall. 0 = holes go right through. |
+| `design.skin_frac` | 0.67 | Share of the height, from the top, that gets the skin. Below it the holes stay open for air and drainage into the cup. |
 
 ### Pattern settings (`patterns.<name>.*`, `src/pots/config/patterns.yaml`)
 

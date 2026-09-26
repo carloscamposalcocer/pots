@@ -31,6 +31,11 @@ def make_field(pot, pattern, params=None):
         else:
             hole = np.maximum(fn(pot, P, th, Z, r, s), -band)  # holes only inside the band
             mat = -hole
+        if pot.skin > 0:
+            # blind pockets above skin_z: the pattern shows outside, but a solid
+            # soil-side skin keeps water from running out through the wall
+            skin = np.minimum(ri + pot.skin - r, Z - pot.skin_z)   # >0 inside the skin
+            mat = np.minimum(mat, -skin)
         wall = np.maximum(shell, mat)
         ci = pot.cup_ri(Z)
         co = ci + pot.cup_wall
