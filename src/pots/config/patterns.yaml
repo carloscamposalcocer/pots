@@ -1,9 +1,9 @@
 # =====================================================================
 # Wall pattern settings: one block per pattern. Only the block of the
-# selected `pattern` is used (bands also uses slots and voronoi_taper).
+# selected `pattern` is used.
 #
 # Override on the command line like any other setting:
-#   pots pattern=lattice_taper patterns.lattice_taper.strut_in=2.5
+#   pots pattern=lattice patterns.lattice.strut_in=2.5
 #   pots pattern=voronoi patterns.voronoi.seed=3
 #
 # Units are mm unless noted.
@@ -11,7 +11,6 @@
 #              height. It scales with height (rounded to an integer, so
 #              the pattern stays seamless) and cells keep their size in
 #              mm, so more cells = smaller holes.
-#   strut      strip/strut width between holes, straight-through patterns.
 #   strut_in   tapered patterns: strut width on the soil side. Wider =
 #              smaller holes inside = less soil loss, less air.
 #   strut_out  tapered patterns: strut width on the outer face. Keep it
@@ -23,14 +22,14 @@
 #              steady slope. 1 moves the soil-side pattern down so each
 #              hole is centred on its outside opening, growing evenly all
 #              round. In between = partly. Above 0 the roofs rise toward
-#              the outside: voronoi_taper and hex_taper have flat bridge
-#              roofs, which then become sloped ceilings that can sag.
+#              the outside: voronoi, hex and isogrid have flat bridge roofs,
+#              which then become sloped ceilings that can sag.
 #
 # Not here on purpose: the 55-degree roof slope and the warp frequencies,
 # which keep the pot support-free and seamless.
 # =====================================================================
 patterns:
-  voronoi_taper:
+  voronoi:
     cells: 76         # 76 -> ~5.3 mm wide cells
     row_h: 5.2        # row height
     jitter: 0.30      # randomness of the cell centres, fraction of a cell (0 = regular grid, keep < 0.5)
@@ -40,22 +39,8 @@ patterns:
     strut_out: 1.1    # 1.1 -> ~58% open, ~3.6 mm holes outside
     center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
-  voronoi:
-    cells: 76
-    row_h: 5.2
-    jitter: 0.30
-    seed: 7
-    warp: 1.2
-    strut: 1.8
-
   hex:
     cells: 84         # 84 -> ~4.8 mm flat-to-flat cells
-    strut: 1.8
-    warp: 1.6         # sideways wobble (amplitude)
-    warp_z: 1.0       # up-down wobble (amplitude)
-
-  hex_taper:
-    cells: 84
     strut_in: 2.2
     strut_out: 1.1
     center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
@@ -72,17 +57,15 @@ patterns:
 
   lattice:
     cells: 72         # 72 -> strips 4.6 mm apart
-    strut: 1.8
-
-  lattice_taper:
-    cells: 72
     strut_in: 3     # 2.2 -> ~27% open, ~2.3 mm holes on the soil side
     strut_out: 0.5    # 1.1 -> ~57% open, ~3.3 mm holes outside
     center: 1       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   isogrid:
     cells: 54         # 54 -> ~7.4 mm triangle sides
-    strut: 1.8
+    strut_in: 2.2
+    strut_out: 1.1
+    center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   louvers:
     cells: 29         # slits per row
@@ -110,22 +93,6 @@ patterns:
     arm: 8.0          # arm length
     width: 2.0
     row_h: 6.8        # row spacing
-
-  bands:              # also uses the slots and voronoi_taper settings
-    band_h: 22.0      # height of the slot band at the bottom
-    sep: 1.5          # solid ring between the two bands
-
-  gyroid:
-    cells: 48
-    cell: 8.0         # cell size (height and wall depth)
-    level_in: 1.00    # density on the soil side (higher = more solid)
-    level_out: 0.62   # density outside
-
-  diamond:
-    cells: 44
-    cell: 8.8
-    level_in: 0.62
-    level_out: 0.40
 
   weave:
     cells: 60

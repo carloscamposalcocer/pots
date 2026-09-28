@@ -13,8 +13,8 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
 ## Current design (decided)
 - Size is driven by H (`pots height=65`; H_REF = 130 is the reference shape). `Pot(height=h)` (geometry.py, a frozen dataclass) scales everything shape-related by k = H/130: radii, R0, cup height, moat gap, and the cell counts around the circumference (rounded to integers, so the pattern stays seamless and cells keep their mm size). Fixed in mm on purpose: wall, rim, base, cup wall, lip overhang, struts, VOR_H, hole size, blends, chamfer. There is no global size state: every function takes the `Pot` explicitly; cell counts are given at H_REF and scaled with `pot.count(ref)`.
 - Reference size 151 x 130 mm. Pot body is tapered: outer radius 56 mm at the bottom, 72 mm at the top. Wall 6 mm thick, solid 5 mm rim at the top.
-- Wall pattern: tapered Voronoi (`voronoi_taper` in patterns.py). The holes flare outward like funnels.
-  - Struts are 2.2 mm on the soil side and thin to 1.1 mm outside (`patterns.voronoi_taper.strut_in` / `strut_out`).
+- Wall pattern: tapered Voronoi (`voronoi` in patterns.py). The holes flare outward like funnels.
+  - Struts are 2.2 mm on the soil side and thin to 1.1 mm outside (`patterns.voronoi.strut_in` / `strut_out`).
   - Result: outside face 58% open, typical hole 3.6 mm. Soil side 29% open, typical hole 2.5 mm.
   - Cells are a periodic jittered Voronoi (76 cells around, 5.2 mm row height, jitter ±0.30, seed 7), with a slight sinusoidal warp.
 - The pattern runs from just above the 2.4 mm solid base up to the rim.
@@ -23,7 +23,7 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
 
 ## Printability rules (keep them)
 - No supports anywhere.
-- Every hole roof must be a flat bridge, no longer than the hole width (at most about 5 mm). The taper is done by shifting the pattern down by exactly the amount the edges recede, so holes only grow sideways and downward. Never let a hole ceiling rise toward the outside: that makes a sagging sloped ceiling. The one opt-in exception is the tapered patterns' `center` setting (0 to 1, default 0, `taper_shift` in patterns.py): it moves the soil-side pattern down so holes are centred, and the CLI warns when it is set on the flat-bridge ones (voronoi_taper, hex_taper).
+- Every hole roof must be a flat bridge, no longer than the hole width (at most about 5 mm). The taper is done by shifting the pattern down by exactly the amount the edges recede, so holes only grow sideways and downward. Never let a hole ceiling rise toward the outside: that makes a sagging sloped ceiling. The one opt-in exception is the tapered patterns' `center` setting (0 to 1, default 0, `taper_shift` in patterns.py): it moves the soil-side pattern down so holes are centred, and the CLI warns when it is set on the flat-bridge ones (voronoi, hex, isogrid).
 - Minimum strut is about 1.1 mm (0.4 mm nozzle).
 - 45-degree chamfer on the bottom outer edge (elephant foot).
 - Every pattern must be periodic around the circumference: integer cell counts, and warp terms with integer frequency in theta.
@@ -31,9 +31,9 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
 ## Code architecture
 - `src/pots/`:
   - geometry.py: `Pot` (all dimensions, derived ones as cached properties; r_out/r_in/cup_ri) and the reference constants (H_REF, radii, cup, LIP, CHAMFER).
-  - patterns.py: `PATTERNS` registry of `Pattern(kind, fn, description)`; each pattern is `fn(pot, P, th, Z, r, s)`, where P = `load_params(cfg.patterns)` holds every block as attributes (P.lattice.strut; `Pattern.uses` lists the other blocks a pattern reads, e.g. bands). Kinds: "3d" lattices (gyroid, diamond, weave; field = material) and "2d" perforations (voronoi, voronoi_taper, hex, hex_taper, drops, lattice, lattice_taper, isogrid, louvers, slots, spiral, chevrons, bands; field = hole). Sloped roofs are drawn at SLOPE = 55 deg in the unrolled plane, so they stay >= 45 deg on the tapered pot (r/r0 is 0.875 to 1.125). The tapered ones (voronoi_taper, hex_taper, drops, lattice_taper) shift the pattern down by recession / (vertical part of the roof normal). Unrolled coordinates use `pot.r0` (64 mm at H_REF).
+  - patterns.py: `PATTERNS` registry of `Pattern(kind, fn, description)`; each pattern is `fn(pot, P, th, Z, r, s)`, where P = `load_params(cfg.patterns)` holds every block as attributes (P.lattice.strut_in; `Pattern.uses` lists the other blocks a pattern reads, none today). Kinds: "3d" (weave; field = material) and "2d" perforations (voronoi, hex, drops, lattice, isogrid, louvers, slots, spiral, chevrons; field = hole). Only the tapered version of a pattern is kept where one exists (the straight voronoi/hex/lattice and the gyroid, diamond and bands patterns were removed; see git history). Sloped roofs are drawn at SLOPE = 55 deg in the unrolled plane, so they stay >= 45 deg on the tapered pot (r/r0 is 0.875 to 1.125). The tapered ones (voronoi, hex, drops, lattice, isogrid) shift the pattern down by recession / (vertical part of the roof normal). Unrolled coordinates use `pot.r0` (64 mm at H_REF).
   - field.py: `make_field(pot, pattern)` assembles lattice wall + rim + base + cup.
-  - sdf.py: smin, cylindrical(), gyroid(), CELL, T_IN/T_OUT.
+  - sdf.py: smin, cylindrical().
   - mesh.py: `build()` = skimage marching_cubes in z-slabs. Slab vertices stay in index space until after merge_vertices, then get scaled. That is what makes the slab seams watertight; don't change it. `clean()` = fast_simplification decimation, keep the largest component, pymeshfix, fix_normals, drop to z=0.
   - pipeline.py: `generate(pot, pattern, voxel, faces)` -> (mesh, field).
   - metrics.py: `wall_metrics(field, pot)`: open %, median hole diameter of both wall faces, and straight-through % (open at 5 depths along the same radial ray); `overhang_share(mesh)`: share of the surface facing down more than 50 deg from vertical, not counting level bridges or the bed face. Both are logged on every build.

@@ -8,7 +8,7 @@ from .geometry import CHAMFER, PATTERN_GAP
 from .patterns import PATTERNS, load_params
 from .sdf import cylindrical, smin
 
-BLEND = 1.5           # blend between a 3D lattice and the solid rim/base band
+BLEND = 1.5           # blend between a 3D pattern (weave) and the solid rim/base band
 
 
 def make_field(pot, pattern, params=None):

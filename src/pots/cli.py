@@ -11,7 +11,7 @@ Examples
     pots size=big height=100          # start from a preset, change one value
     pots pattern=hex                  # another pattern
     pots design.wall=4                # thinner wall (mm, does not scale)
-    pots pattern=lattice_taper patterns.lattice_taper.strut_in=2.5
+    pots pattern=lattice patterns.lattice.strut_in=2.5
                                       # a pattern setting (config/patterns.yaml)
     pots height=65 --show             # print the resolved settings, don't build
     pots --all                        # every pattern, one after another
@@ -68,7 +68,7 @@ def pot_from_config(cfg):
 
 
 # tapered patterns whose hole roofs are flat bridges (the others have 55-degree roofs)
-BRIDGE_ROOFS = {"voronoi_taper", "hex_taper"}
+BRIDGE_ROOFS = {"voronoi", "hex", "isogrid"}
 
 
 def check_pattern_params(cfg):

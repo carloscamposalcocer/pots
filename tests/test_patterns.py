@@ -16,17 +16,16 @@ def test_every_pattern_has_a_settings_block():
 
 
 def test_config_carries_the_pattern_settings():
-    cfg = load_config(["patterns.lattice_taper.strut_in=2.5"])
+    cfg = load_config(["patterns.lattice.strut_in=2.5"])
     P = load_params(cfg.patterns)
-    assert P.lattice_taper.strut_in == 2.5
-    assert P.voronoi_taper.cells == load_params().voronoi_taper.cells
+    assert P.lattice.strut_in == 2.5
+    assert P.voronoi.cells == load_params().voronoi.cells
 
 
 @pytest.mark.parametrize("name, override", [
-    ("lattice", {"strut": 2.4}),
+    ("isogrid", {"strut_in": 2.6}),
     ("voronoi", {"seed": 3}),
-    ("lattice_taper", {"strut_in": 2.6}),
-    ("bands", {"slots": {"width": 1.6}}),
+    ("lattice", {"strut_in": 2.6}),
 ])
 def test_settings_change_the_field(name, override):
     pot = Pot(height=65, wall=4.0)
@@ -37,9 +36,7 @@ def test_settings_change_the_field(name, override):
     pts = [a.astype(np.float32) for a in (r * np.cos(th), r * np.sin(th), z)]
     params = vars(load_params()).copy()
     changed = {k: dict(vars(v)) for k, v in params.items()}
-    block = override if "slots" in override else {name: override}
-    for k, v in block.items():
-        changed[k].update(v)
+    changed[name].update(override)
     assert not np.allclose(make_field(pot, name)(*pts), make_field(pot, name, changed)(*pts))
 
 
@@ -51,15 +48,15 @@ def test_unknown_pattern_setting_is_rejected():
 
 def test_warns_about_thin_struts(caplog):
     with caplog.at_level(logging.WARNING, logger="pots"):
-        pot_from_config(load_config(["pattern=lattice_taper", "patterns.lattice_taper.strut_out=0.8"]))
+        pot_from_config(load_config(["pattern=lattice", "patterns.lattice.strut_out=0.8"]))
     assert "too thin" in caplog.text
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="pots"):
-        pot_from_config(load_config(["pattern=bands", "patterns.voronoi_taper.strut_out=3"]))
+        pot_from_config(load_config(["pattern=voronoi", "patterns.voronoi.strut_out=3"]))
     assert "narrow outward" in caplog.text
 
 
-@pytest.mark.parametrize("name", ["voronoi_taper", "hex_taper", "lattice_taper"])
+@pytest.mark.parametrize("name", ["voronoi", "hex", "lattice", "isogrid"])
 def test_center_lines_up_the_holes(name):
     """center=0 keeps each roof level (holes grow downward); center=1 puts
     the soil-side hole in the middle of its outside opening."""
@@ -89,7 +86,7 @@ def test_center_lines_up_the_holes(name):
 
 def test_center_is_checked(caplog):
     with pytest.raises(ValueError, match="between 0 and 1"):
-        pot_from_config(load_config(["patterns.voronoi_taper.center=1.5"]))
+        pot_from_config(load_config(["patterns.voronoi.center=1.5"]))
     with caplog.at_level(logging.WARNING, logger="pots"):
-        pot_from_config(load_config(["patterns.voronoi_taper.center=1"]))
+        pot_from_config(load_config(["patterns.voronoi.center=1"]))
     assert "may sag" in caplog.text

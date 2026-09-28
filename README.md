@@ -102,11 +102,10 @@ pot size, so they **do not scale** with `height`.
 
 Every pattern has its own block in `patterns.yaml`: cell count, strut or
 slot widths, jitter, warp, and so on, each documented there. Only the block
-of the selected `pattern` is used (`bands` also reads `slots` and
-`voronoi_taper`). Override like any other key:
+of the selected `pattern` is used. Override like any other key:
 
 ```
-pots pattern=lattice_taper patterns.lattice_taper.strut_in=2.5
+pots pattern=lattice patterns.lattice.strut_in=2.5
 pots pattern=voronoi patterns.voronoi.seed=3 patterns.voronoi.cells=60
 ```
 
@@ -115,14 +114,13 @@ Keys most patterns share:
 | Key | Description |
 |---|---|
 | `cells` | Cells around the pot at the 130 mm reference height; scaled with `height` (see [Scaling](#scaling-with-height)). More cells = smaller holes. |
-| `strut` | Straight-through patterns: strut width between holes (1.8 mm). |
-| `strut_in` | Tapered patterns (`voronoi_taper`, `hex_taper`, `drops`, `lattice_taper`): strut width on the soil side (2.2 mm). Wider = smaller inner holes = less soil loss, less air. |
+| `strut_in` | Tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`): strut width on the soil side (2.2 mm). Wider = smaller inner holes = less soil loss, less air. |
 | `strut_out` | Tapered patterns: strut width on the outside (1.1 mm). Keep ≥ ~1.1 (0.4 mm nozzle) and ≤ `strut_in` so holes widen outward. |
-| `center` | Tapered patterns, 0 to 1 (default 0). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi_taper` and `hex_taper` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice_taper` have 55° roofs and barely change. |
+| `center` | Tapered patterns, 0 to 1 (default 0). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex` and `isogrid` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice` have 55° roofs and barely change. |
 
-With the defaults, `voronoi_taper` is 58% open outside (typical hole
-3.6 mm) and 29% open on the soil side (typical hole 2.5 mm); `lattice_taper`
-57% (3.3 mm) and 27% (2.3 mm). The 55° roof slope and the warp frequencies
+With the defaults, `voronoi` is 58% open outside (typical hole
+3.6 mm) and 29% open on the soil side (typical hole 2.5 mm); `lattice` at
+2.2 / 1.1 mm struts is 57% (3.3 mm) and 27% (2.3 mm). The 55° roof slope and the warp frequencies
 are not settings: they keep the pot support-free and seamless.
 
 ## Scaling with height
@@ -148,17 +146,14 @@ from outside, next to a 40 x 30 mm true-scale swatch of the outer wall face
 
 | | |
 |---|---|
-| **`voronoi_taper`** (default), 2D, tapered: organic cells that flare outward like funnels. <br> ![voronoi_taper](docs/patterns/voronoi_taper.png) | **`voronoi`**, 2D: the same cells with straight-through holes and 1.8 mm struts. <br> ![voronoi](docs/patterns/voronoi.png) |
-| **`hex`**, 2D: warped honeycomb, pointy-top cells, 1.8 mm struts. <br> ![hex](docs/patterns/hex.png) | **`hex_taper`**, 2D, tapered: the honeycomb flaring outward like `voronoi_taper`. <br> ![hex_taper](docs/patterns/hex_taper.png) |
-| **`drops`**, 2D, tapered: staggered teardrops with 55° pointed tops, flaring outward. <br> ![drops](docs/patterns/drops.png) | **`lattice`**, 2D: diamond trellis of helical strips crossing at ±55°, no bridges at all. <br> ![lattice](docs/patterns/lattice.png) |
-| **`isogrid`**, 2D: triangle grid; the downward triangles have short flat bridges. <br> ![isogrid](docs/patterns/isogrid.png) | **`louvers`**, 2D: gills that run down and outward through the wall like shutter blades. No line of sight: soil stays in, rain runs off. <br> ![louvers](docs/patterns/louvers.png) |
+| **`voronoi`** (default), 2D, tapered: organic cells that flare outward like funnels. <br> ![voronoi](docs/patterns/voronoi.png) | **`hex`**, 2D, tapered: warped honeycomb, pointy-top cells, flaring outward like `voronoi`. <br> ![hex](docs/patterns/hex.png) |
+| **`drops`**, 2D, tapered: staggered teardrops with 55° pointed tops, flaring outward. <br> ![drops](docs/patterns/drops.png) | **`lattice`**, 2D, tapered: diamond trellis of helical strips crossing at ±55°, no bridges at all, flaring outward like `voronoi`. <br> ![lattice](docs/patterns/lattice.png) |
+| **`isogrid`**, 2D, tapered: triangle grid flaring outward like `voronoi`; the downward triangles have short flat bridges. <br> ![isogrid](docs/patterns/isogrid.png) | **`louvers`**, 2D: gills that run down and outward through the wall like shutter blades. No line of sight: soil stays in, rain runs off. <br> ![louvers](docs/patterns/louvers.png) |
 | **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) | **`spiral`**, 2D: slots on a many-start 60° helix. <br> ![spiral](docs/patterns/spiral.png) |
-| **`chevrons`**, 2D: stacked arrowhead slots. <br> ![chevrons](docs/patterns/chevrons.png) | **`bands`**, 2D: a row of air-pruning slots at the base, `voronoi_taper` above. <br> ![bands](docs/patterns/bands.png) |
-| **`gyroid`**, 3D lattice: graded density through the wall, no straight line of sight. <br> ![gyroid](docs/patterns/gyroid.png) | **`diamond`**, 3D lattice: Schwarz diamond, straighter 45° channels. <br> ![diamond](docs/patterns/diamond.png) |
-| **`weave`**, 3D: two sets of strips woven over and under through the wall (the swatch shows only where they touch the outer face). <br> ![weave](docs/patterns/weave.png) | **`lattice_taper`**, 2D, tapered: the diamond trellis flaring outward like `voronoi_taper`; the pointed top of each diamond stays put. <br> ![lattice_taper](docs/patterns/lattice_taper.png) |
+| **`chevrons`**, 2D: stacked arrowhead slots. <br> ![chevrons](docs/patterns/chevrons.png) | **`weave`**, 3D: two sets of strips woven over and under through the wall (the swatch shows only where they touch the outer face). <br> ![weave](docs/patterns/weave.png) |
 
 2D patterns are cut radially through the wall (louvers slope down through
-it); 3D lattices are tortuous channels. All wrap seamlessly around the pot.
+it). All wrap seamlessly around the pot.
 Sloped hole roofs are at least 55° from horizontal in the unrolled pattern,
 so at least 45° on the real, tapered pot, and no hole closes into a loop,
 so the wall is always one piece.
@@ -202,7 +197,7 @@ from pots import Pot, generate
 from pots.metrics import wall_metrics
 
 pot = Pot(height=65, wall=4.0)                 # every size of one pot
-mesh, field = generate(pot, "voronoi_taper", voxel=0.6, faces=100_000)
+mesh, field = generate(pot, "voronoi", voxel=0.6, faces=100_000)
 mesh.export("pot.3mf")
 print(wall_metrics(field, pot))                # open %, hole size on both faces
 ```
@@ -217,7 +212,7 @@ src/pots/
   geometry.py   Pot: all dimensions, scaled from the height
   patterns.py   wall patterns (PATTERNS registry)
   field.py      make_field(): wall + rim + base + cup as one implicit field
-  sdf.py        field helpers (smin, cylindrical gyroid)
+  sdf.py        field helpers (smin, cylindrical)
   mesh.py       slab-wise marching cubes, decimation and repair
   pipeline.py   generate(): field -> clean, watertight mesh
   metrics.py    open %, hole size and straight-through % of both wall faces
