@@ -1,6 +1,7 @@
 import pytest
+from omegaconf import OmegaConf
 
-from pots.cli import load_config, main, pot_from_config
+from pots.cli import CONFIG_DIR, load_config, main, pot_from_config
 from pots.patterns import PATTERNS
 
 
@@ -33,15 +34,20 @@ def test_show_and_bad_key(capsys):
         main(["--nope"])
 
 
-@pytest.mark.parametrize("size, height, wall", [("big", 130, 6.0), ("small", 50, 4.0)])
-def test_size_presets(size, height, wall):
+@pytest.mark.parametrize("size", ["big", "small"])
+def test_size_presets(size):
+    """The preset is applied on top of config.yaml (checked against the
+    preset file, so retuning a preset doesn't break the test)."""
+    preset = OmegaConf.load(CONFIG_DIR / "size" / f"{size}.yaml")
     pot = pot_from_config(load_config([f"size={size}"]))
-    assert (pot.height, pot.wall) == (height, wall)
+    assert (pot.height, pot.wall) == (preset.height, preset.design.wall)
 
 
 def test_overrides_beat_size_preset():
-    pot = pot_from_config(load_config(["size=big", "height=100", "design.wall=5"]))
-    assert (pot.height, pot.wall) == (100, 5)
+    preset = OmegaConf.load(CONFIG_DIR / "size" / "big.yaml")
+    height, wall = preset.height + 7, preset.design.wall - 1     # anything the preset doesn't set
+    pot = pot_from_config(load_config(["size=big", f"height={height}", f"design.wall={wall}"]))
+    assert (pot.height, pot.wall) == (height, wall)
 
 
 def test_all_configs(capsys):

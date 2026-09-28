@@ -37,7 +37,7 @@ patterns:
     warp: 1.2         # sideways wobble of the cells (amplitude)
     strut_in: 2.2     # 2.2 -> ~29% open, ~2.5 mm holes on the soil side
     strut_out: 1.1    # 1.1 -> ~58% open, ~3.6 mm holes outside
-    center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   hex:
     cells: 84         # 84 -> ~4.8 mm flat-to-flat cells
@@ -53,19 +53,19 @@ patterns:
     row: 1.05         # row height, as a fraction of the cell width
     strut_in: 2.2
     strut_out: 1.1
-    center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   lattice:
     cells: 72         # 72 -> strips 4.6 mm apart
     strut_in: 3     # 2.2 -> ~27% open, ~2.3 mm holes on the soil side
     strut_out: 0.5    # 1.1 -> ~57% open, ~3.3 mm holes outside
-    center: 1       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   isogrid:
     cells: 54         # 54 -> ~7.4 mm triangle sides
     strut_in: 2.2
     strut_out: 1.1
-    center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   louvers:
     cells: 29         # slits per row

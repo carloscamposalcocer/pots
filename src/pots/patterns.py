@@ -272,14 +272,18 @@ def pat_isogrid(pot, P, th, Z, r, s):
     the wall. The two kinds of roof edge have different normals (vertical
     part 1 for the level struts, cos 60 for the others), so each strut set is
     moved down by its own recession / nz: every lower strut edge (a hole
-    roof) stays where it is and the holes grow sideways and downward."""
+    roof) stays where it is and the holes grow sideways and downward. The
+    strut sets can't also meet in clean vertices at every depth, so the
+    shifts are measured from the soil side, where the holes hold the soil.
+    With center = 1 no set moves at all: the struts just widen evenly and
+    each hole stays a centred triangle."""
     c = P.isogrid
     a = pot.circ / pot.count(c.cells)             # triangle side
     h = a * np.sqrt(3) / 2
     S, ZZ = unroll(pot, th, Z)
     strut = taper(c, s)
-    z0 = ZZ + taper_shift(c, s, 1.0)              # level struts
-    z60 = ZZ + taper_shift(c, s, 0.5)             # 60-degree struts
+    z0 = ZZ + taper_shift(c, s, 1.0) - taper_shift(c, 0.0, 1.0)     # level struts
+    z60 = ZZ + taper_shift(c, s, 0.5) - taper_shift(c, 0.0, 0.5)    # 60-degree struts
     cot = 1 / np.sqrt(3)                          # cot 60
     d0 = stripes(z0, h)
     d1 = stripes(S + z60 * cot, a) * np.sqrt(3) / 2
