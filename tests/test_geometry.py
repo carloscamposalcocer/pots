@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from pots.geometry import H_REF, LIP, Pot
+from pots.geometry import H_REF, LIP, SHAPES, Pot
 
 
 def test_reference_size():
@@ -23,6 +23,34 @@ def test_shape_scales_but_print_sizes_do_not():
 def test_cup_lip_sits_outside_pot_top(h):
     pot = Pot(height=h)
     assert pot.cup_ri(pot.cup_h) == pytest.approx(pot.r_top + LIP)
+
+
+@pytest.mark.parametrize("shape", SHAPES)
+@pytest.mark.parametrize("h", [18, 50, 130, 200])
+def test_every_shape_prints_and_keeps_the_patterns_valid(shape, h):
+    pot = Pot(height=h, shape=shape)
+    z = np.linspace(0, h, 2000)
+    r = pot.r_out(z)
+    # the radius range the patterns are designed for (r / r0 = 0.875 to 1.125)
+    assert r.min() >= pot.r_min - 1e-9 and r.max() <= pot.r_wide + 1e-9
+    assert np.abs(np.diff(r) / np.diff(z)).max() < np.tan(np.deg2rad(25))   # gentle walls
+
+
+@pytest.mark.parametrize("shape", SHAPES)
+@pytest.mark.parametrize("h", [18, 50, 130, 200])
+def test_cup_follows_every_shape(shape, h):
+    pot = Pot(height=h, shape=shape)
+    above = np.linspace(pot.cup_h, h, 500)
+    assert pot.cup_ri(pot.cup_h) >= pot.r_out(above).max() + LIP - 1e-9     # catches drips
+    z = np.linspace(0, pot.cup_h, 400)
+    assert (pot.cup_ri(z) - pot.r_out(z)).min() >= 0.9 * pot.cup_gap       # moat stays open
+    assert np.abs(np.diff(pot.cup_ri(z)) / np.diff(z)).max() < 1.0         # support-free
+    assert pot.r_max > pot.cup_ri(0) + pot.cup_wall and pot.r_max > pot.cup_lip + pot.cup_wall
+
+
+def test_unknown_shape_is_rejected():
+    with pytest.raises(ValueError, match="unknown shape"):
+        Pot(shape="vase")
 
 
 def test_counts_are_integers():

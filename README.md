@@ -55,7 +55,8 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 
 | Key | Default | Description |
 |---|---|---|
-| `pattern` | `voronoi_taper` | Wall pattern, see [Patterns](#patterns). |
+| `pattern` | `voronoi` | Wall pattern, see [Patterns](#patterns). |
+| `shape` | `tapered` | Pot profile, see [Pot shapes](#pot-shapes). |
 | `size` | `small` | Size preset: `big` or `small`, see [Size presets](#size-presets-srcpotsconfsize). |
 | `height` | from `size` | Pot height in mm. **Drives the whole shape**, see [Scaling](#scaling-with-height). Minimum `base + rim + 10` (17.4 mm). |
 | `preview` | `true` | Also render the PNG preview (~10 s). |
@@ -128,15 +129,41 @@ are not settings: they keep the pot support-free and seamless.
 `height` sets a scale factor `k = height / 130` applied to everything that
 defines the *shape*:
 
-- outer radius: 56·k at the bottom, 72·k at the top
+- outer radius: 56·k at the bottom, 72·k at the top (`shape=tapered`;
+  every shape stays between those two)
 - cup height (28·k) and moat gap at the bottom (5·k); the cup lip always
-  sits 1 mm outside the top of the pot so drips land in it
+  sits 1 mm outside the widest part of the pot above it so drips land in it
 - number of pattern cells around the pot, rounded to an integer so the
   pattern stays seamless and each cell keeps its size in mm
 
 What stays fixed in mm: the `design` sizes, hole size, row height of the
 cells, the lip overhang and the bottom chamfer. So a small pot has fewer,
 same-size holes and a proportionally thicker wall.
+
+## Pot shapes
+
+Pick one with `shape=<name>` (`pots shape=barrel`). Top: the 100 mm pot
+(`size=big`) in each shape with the default pattern. Bottom: a vertical
+section through the middle, with the soil and the water the moat holds when
+the cup is filled to the lip.
+
+![pot shapes](docs/shapes.png)
+
+| `shape=` | Profile |
+|---|---|
+| `tapered` | Cone, narrow at the bottom. Default. |
+| `straight` | Cylinder. Least water: the moat is only the 5·k mm gap. |
+| `bowl` | Flares fast low down, near vertical at the rim. |
+| `tulip` | Near vertical low down, flares out at the rim. |
+| `barrel` | Bulges out a little above mid-height, narrower rim. Most soil. |
+| `hourglass` | Narrow waist a little below mid-height. |
+
+Every shape stays between the same narrowest and widest radius (56·k and
+72·k mm). The patterns are drawn for that range, so every pattern keeps its
+hole sizes, strut widths and 45° roofs on every shape (the voronoi wall stays
+58% / 29% open on all six). No wall leans more than 24° from vertical, and
+the cup follows the shape: it starts a moat gap out from the pot and its lip
+sits just outside the widest part of the wall above it.
 
 ## Patterns
 
@@ -170,6 +197,7 @@ pots-gallery hex slots                # only these
 pots-gallery quality=draft            # faster, coarser
 pots-gallery size=big --images pics   # the 130 mm pot, images in pics/
 pots-gallery height=90 design.wall=5  # any shape setting of `pots`
+pots-gallery --shapes size=big        # only docs/shapes.png: every pot shape (~9 min)
 ```
 
 It takes the shape settings of `pots` (`size`, `height`, `design.*`,
@@ -219,6 +247,7 @@ src/pots/
   preview.py    PNG preview and the small gallery image
 tests/          pytest suite (uv run pytest)
 docs/patterns/  gallery images used in this README (pots-gallery)
+docs/shapes.png pot shape sheet (pots-gallery --shapes size=big)
 ```
 
 The model is an implicit field (negative = solid), meshed with marching

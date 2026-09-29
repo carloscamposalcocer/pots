@@ -26,7 +26,7 @@ class FaceWindow:
 def face_window(pot, width=70.0, height=50.0, px=0.1):
     """A window at mid-height, shrunk on small pots to stay inside the pattern band."""
     wz = min(height, pot.height - pot.base - pot.rim - 4.0)
-    ww = min(width, np.pi * pot.r_bot)
+    ww = min(width, np.pi * pot.r_min)
     z0 = pot.height / 2 - wz / 2
     return FaceWindow(np.arange(0, ww, px), np.arange(z0, z0 + wz, px), px)
 

@@ -43,6 +43,21 @@ defaults:
 # ---------------------------------------------------------------------
 pattern: voronoi
 
+# ---------------------------------------------------------------------
+# shape: profile of the pot body. Every shape stays between the same
+# narrowest and widest radius (56 and 72 mm on the 130 mm pot), so every
+# pattern prints the same on all of them, and no wall leans more than
+# 24 degrees. The cup lip always sits just outside the widest part of
+# the pot above it, so drips land in it.
+#   tapered    cone, narrow at the bottom (default).
+#   straight   cylinder.
+#   bowl       flares fast low down, near vertical at the rim.
+#   tulip      near vertical low down, flares out at the rim.
+#   barrel     bulges out a little above mid-height, narrower rim.
+#   hourglass  narrow waist a little below mid-height.
+# ---------------------------------------------------------------------
+shape: tapered
+
 # height (mm) comes from the size preset (config/size/); see there.
 
 # preview: also render a PNG (outside view, cut-away, vertical section,

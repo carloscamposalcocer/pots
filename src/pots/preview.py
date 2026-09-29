@@ -21,7 +21,7 @@ def draw_mesh(ax, tris, normals, pot, elev, azim, pad=4, tight=False):
     sh = np.clip(normals @ LIGHT, 0, 1) * 0.75 + 0.2
     col = np.stack([0.30 * sh + 0.04, 0.52 * sh + 0.04, 0.36 * sh + 0.04, np.ones_like(sh)], 1).clip(0, 1)
     ax.add_collection3d(Poly3DCollection(tris, facecolors=col, edgecolors="none"))
-    lim = pot.r_top + pad
+    lim = pot.r_wide + pad
     zpad = 2 if tight else 10
     ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim); ax.set_zlim(-zpad, pot.height + zpad)
     ax.set_box_aspect((1, 1, (pot.height + 2 * zpad) / (2 * lim)) if tight else (1, 1, 1))
@@ -48,7 +48,7 @@ def render(mesh, field, pot, path, title):
 
     # vertical section straight from the field
     ax = fig.add_subplot(2, 3, 3)
-    s = np.arange(-pot.r_top - 4, pot.r_top + 4, 0.15); z = np.arange(-1, pot.height + 1, 0.15)
+    s = np.arange(-pot.r_max, pot.r_max, 0.15); z = np.arange(-1, pot.height + 1, 0.15)
     S, Z = np.meshgrid(s, z)
     F = field(S.astype(np.float32), np.full(S.shape, 0.7, np.float32), Z.astype(np.float32)) < 0
     ax.imshow(F, origin="lower", extent=[s[0], s[-1], z[0], z[-1]], cmap="Greys")
@@ -86,3 +86,73 @@ def render_card(mesh, field, pot, path, title):
     fig.suptitle(title, fontsize=14)
     plt.tight_layout(); plt.savefig(path, dpi=80); plt.close(fig)
     log.info("card saved %s", path)
+
+
+POT_GREY, WATER_BLUE, SOIL_BROWN, INK, MUTED = "#8f9a94", "#cfe2f2", "#eee4d6", "#333333", "#777777"
+
+
+def volumes_ml(pot, n=400):
+    """(soil in L, water in ml): the inside of the pot above the base, and the
+    moat between the pot and the cup filled to the lip."""
+    z = np.linspace(pot.base, pot.height, n)
+    soil = np.trapezoid(np.pi * pot.r_in(z) ** 2, z)
+    z = np.linspace(pot.base, pot.cup_h, n)
+    water = np.trapezoid(np.pi * (pot.cup_ri(z) ** 2 - pot.r_out(z) ** 2).clip(0), z)
+    return soil / 1e6, water / 1000
+
+
+def render_shapes(pot, path, meshes=None):
+    """Every pot shape side by side as a vertical section through the middle:
+    wall, base, cup, soil and the water the moat holds, drawn straight from
+    the Pot geometry (the wall solid, without the pattern). `meshes`
+    ({shape: mesh}) adds a row of outside views above the sections."""
+    import dataclasses
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+
+    from .geometry import SHAPES
+
+    names = list(SHAPES)
+    rows = 2 if meshes else 1
+    fig = plt.figure(figsize=(3.1 * len(names), 4.6 + 3.4 * (rows - 1)))
+    lim = pot.r_max
+    for col, name in enumerate(names):
+        p = dataclasses.replace(pot, shape=name)
+        if meshes:
+            m = decimate(meshes[name], PREVIEW_FACES)
+            ax3 = fig.add_subplot(rows, len(names), col + 1, projection="3d")
+            draw_mesh(ax3, m.triangles, m.face_normals, p, 14, -60, pad=2, tight=True)
+            ax3.set_title(name, fontsize=12, color=INK)
+        ax = fig.add_subplot(rows, len(names), len(names) * (rows - 1) + col + 1)
+        z = np.linspace(0, p.height, 300)
+        zc = np.linspace(0, p.cup_h, 100)
+        soil, water = volumes_ml(p)
+        zs = z[z >= p.base]
+        ax.fill_betweenx(zs, -p.r_in(zs), p.r_in(zs), color=SOIL_BROWN, lw=0)
+        for side in (-1, 1):
+            zw = zc[zc >= p.base]
+            ax.fill_betweenx(zw, side * p.r_out(zw), side * p.cup_ri(zw), color=WATER_BLUE, lw=0)
+            ax.fill_betweenx(z, side * p.r_in(z), side * p.r_out(z), color=POT_GREY, lw=0)
+            ax.fill_betweenx(zc, side * p.cup_ri(zc), side * (p.cup_ri(zc) + p.cup_wall), color=POT_GREY, lw=0)
+        ax.fill_between([-p.cup_ri(0) - p.cup_wall, p.cup_ri(0) + p.cup_wall], 0, p.base, color=POT_GREY, lw=0)
+        ax.set_xlim(-lim, lim); ax.set_ylim(0, p.height + 2)
+        ax.set_aspect("equal")
+        label = f"{soil:.2f} L soil, {water:.0f} ml water"
+        ax.set_title(label if meshes else f"{name}\n{label}", fontsize=10 if meshes else 11, color=INK)
+        ax.tick_params(labelsize=8, colors=MUTED)
+        for sp in ax.spines.values():
+            sp.set_visible(False)
+        ax.set_xlabel("mm", fontsize=8, color=MUTED)
+        if col:
+            ax.set_yticklabels([])
+    fig.legend(handles=[Patch(color=POT_GREY, label="pot + cup (pattern not drawn)"),
+                        Patch(color=SOIL_BROWN, label="soil"),
+                        Patch(color=WATER_BLUE, label="water reserve, cup filled to the lip")],
+               loc="lower center", ncol=3, frameon=False, fontsize=9)
+    fig.suptitle(f"Pot shapes, shape=...  (H {pot.height:g} mm, vertical sections at the same scale)",
+                 fontsize=14, color=INK)
+    plt.tight_layout(rect=(0, 0.06 / rows, 1, 1)); plt.savefig(path, dpi=90); plt.close(fig)
+    log.info("shape sheet saved %s", path)

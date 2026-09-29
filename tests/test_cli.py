@@ -23,6 +23,13 @@ def test_bad_values():
         pot_from_config(load_config(["pattern=nope"]))
     with pytest.raises(ValueError, match="at least"):
         pot_from_config(load_config(["height=5"]))
+    with pytest.raises(ValueError, match="unknown shape"):
+        pot_from_config(load_config(["shape=nope"]))
+
+
+def test_shape_setting():
+    assert pot_from_config(load_config([])).shape == "tapered"
+    assert pot_from_config(load_config(["shape=barrel"])).shape == "barrel"
 
 
 def test_show_and_bad_key(capsys):

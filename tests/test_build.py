@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from pots import PATTERNS, Pot, generate
+from pots.geometry import SHAPES
 from pots.metrics import overhang_share
 from pots.patterns import Pattern
 
@@ -41,3 +42,14 @@ def test_pattern_has_no_loose_parts(name, caplog):
     assert "detached" not in caplog.text
     assert mesh.is_watertight and mesh.body_count == 1
     assert overhang_share(mesh) < 0.12      # hex, the worst of the existing ones, is ~0.09
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("shape", SHAPES)
+def test_every_shape_builds_clean(shape, caplog):
+    pot = Pot(height=40, wall=4.0, shape=shape)
+    with caplog.at_level(logging.WARNING, logger="pots.mesh"):
+        mesh, _ = generate(pot, "voronoi", voxel=0.6, faces=60_000)
+    assert "detached" not in caplog.text
+    assert mesh.is_watertight and mesh.body_count == 1
+    assert overhang_share(mesh) < 0.12

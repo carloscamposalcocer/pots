@@ -12,7 +12,7 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
 
 ## Current design (decided)
 - Size is driven by H (`pots height=65`; H_REF = 130 is the reference shape). `Pot(height=h)` (geometry.py, a frozen dataclass) scales everything shape-related by k = H/130: radii, R0, cup height, moat gap, and the cell counts around the circumference (rounded to integers, so the pattern stays seamless and cells keep their mm size). Fixed in mm on purpose: wall, rim, base, cup wall, lip overhang, struts, VOR_H, hole size, blends, chamfer. There is no global size state: every function takes the `Pot` explicitly; cell counts are given at H_REF and scaled with `pot.count(ref)`.
-- Reference size 151 x 130 mm. Pot body is tapered: outer radius 56 mm at the bottom, 72 mm at the top. Wall 6 mm thick, solid 5 mm rim at the top.
+- Reference size 151 x 130 mm. Pot body is tapered: outer radius 56 mm at the bottom, 72 mm at the top. That is the default `shape=tapered`; `SHAPES` in geometry.py (top-level `shape` config key, `Pot.shape`) also has straight, bowl, tulip, barrel, hourglass: r_out = R_MIN + (R_MAX - R_MIN) * f(z / H). Every shape must stay within R_MIN..R_MAX (56..72 at H_REF, so r/r0 stays 0.875..1.125 and the patterns' strut widths and 55-degree roofs hold) and lean at most ~24 deg. The cup follows the shape (`Pot.cup_lip`: widest wall above the cup + LIP); tested. `pots-gallery --shapes size=big` redraws docs/shapes.png (`preview.render_shapes`: 3D views + sections with soil/water volumes, ~9 min). Wall 6 mm thick, solid 5 mm rim at the top.
 - Wall pattern: tapered Voronoi (`voronoi` in patterns.py). The holes flare outward like funnels.
   - Struts are 2.2 mm on the soil side and thin to 1.1 mm outside (`patterns.voronoi.strut_in` / `strut_out`).
   - Result: outside face 58% open, typical hole 3.6 mm. Soil side 29% open, typical hole 2.5 mm.
@@ -30,7 +30,7 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
 
 ## Code architecture
 - `src/pots/`:
-  - geometry.py: `Pot` (all dimensions, derived ones as cached properties; r_out/r_in/cup_ri) and the reference constants (H_REF, radii, cup, LIP, CHAMFER).
+  - geometry.py: `Pot` (all dimensions, derived ones as cached properties; r_out/r_in/cup_ri) and the reference constants (H_REF, R_MIN/R_MAX, SHAPES, cup, LIP, CHAMFER).
   - patterns.py: `PATTERNS` registry of `Pattern(kind, fn, description)`; each pattern is `fn(pot, P, th, Z, r, s)`, where P = `load_params(cfg.patterns)` holds every block as attributes (P.lattice.strut_in; `Pattern.uses` lists the other blocks a pattern reads, none today). Kinds: "3d" (weave; field = material) and "2d" perforations (voronoi, hex, drops, lattice, isogrid, louvers, slots, spiral, chevrons; field = hole). Only the tapered version of a pattern is kept where one exists (the straight voronoi/hex/lattice and the gyroid, diamond and bands patterns were removed; see git history). Sloped roofs are drawn at SLOPE = 55 deg in the unrolled plane, so they stay >= 45 deg on the tapered pot (r/r0 is 0.875 to 1.125). The tapered ones (voronoi, hex, drops, lattice, isogrid) shift the pattern down by recession / (vertical part of the roof normal). Unrolled coordinates use `pot.r0` (64 mm at H_REF).
   - field.py: `make_field(pot, pattern)` assembles lattice wall + rim + base + cup.
   - sdf.py: smin, cylindrical().

@@ -10,6 +10,7 @@ Examples
     pots size=big                     # the 130 mm reference pot
     pots size=big height=100          # start from a preset, change one value
     pots pattern=hex                  # another pattern
+    pots shape=barrel                 # another pot shape
     pots design.wall=4                # thinner wall (mm, does not scale)
     pots pattern=lattice patterns.lattice.strut_in=2.5
                                       # a pattern setting (config/patterns.yaml)
@@ -36,7 +37,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .geometry import Pot
+from .geometry import SHAPES, Pot
 from .patterns import PATTERNS
 
 log = logging.getLogger("pots")
@@ -47,7 +48,8 @@ FLAGS = {"-v", "--verbose", "--show", "--all"}
 
 def usage():
     names = "\n".join(f"    {n:<15} {p.description}" for n, p in PATTERNS.items())
-    return f"{__doc__}\nPatterns (pattern=...)\n{names}\n"
+    shapes = "\n".join(f"    {n:<15} {d}" for n, (d, _) in SHAPES.items())
+    return f"{__doc__}\nPatterns (pattern=...)\n{names}\n\nPot shapes (shape=...)\n{shapes}\n"
 
 
 def load_config(overrides):
@@ -62,7 +64,7 @@ def pot_from_config(cfg):
     """Validated Pot for a config; raises ValueError with a user-facing message."""
     if cfg.pattern not in PATTERNS:
         raise ValueError(f"unknown pattern '{cfg.pattern}'; choose from: {', '.join(sorted(PATTERNS))}")
-    pot = Pot(height=float(cfg.height), **{k: float(v) for k, v in cfg.design.items()})
+    pot = Pot(height=float(cfg.height), shape=str(cfg.shape), **{k: float(v) for k, v in cfg.design.items()})
     check_pattern_params(cfg)
     return pot
 
@@ -113,8 +115,8 @@ def run(cfg):
         log.error(e)
         raise SystemExit(2)
     q = cfg.quality
-    log.info("height %.1f mm (x%.3f): radius %.1f -> %.1f mm, cup %.1f mm tall, wall %.1f mm",
-             pot.height, pot.k, pot.r_bot, pot.r_top, pot.cup_h, pot.wall)
+    log.info("%s pot, height %.1f mm (x%.3f): radius %.1f -> %.1f mm, cup %.1f mm tall, wall %.1f mm",
+             pot.shape, pot.height, pot.k, pot.r_bot, pot.r_top, pot.cup_h, pot.wall)
 
     out = Path(cfg.out)
     out.mkdir(parents=True, exist_ok=True)
