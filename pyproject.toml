@@ -1,7 +1,7 @@
 [project]
 name = "pots"
 version = "0.1.0"
-description = "Single-piece, support-free, 3D-printable breathing plant pot, generated from an implicit field"
+description = "Single-piece, support-free, 3D-printable breathing plant pot, generated from code"
 readme = "README.md"
 authors = [
     { name = "Carlos Campos", email = "carlos.campos@reeldata.ai" }
@@ -37,5 +37,5 @@ build-backend = "uv_build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q -m 'not slow'"
-markers = ["slow: builds every pattern (~2 min); run with `pytest -m slow`"]
+markers = ["slow: builds every pattern and shape (~3 min); run with `pytest -m slow`"]
 filterwarnings = ["ignore::DeprecationWarning:skimage.*"]

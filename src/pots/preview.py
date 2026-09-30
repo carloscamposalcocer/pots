@@ -46,16 +46,12 @@ def render(mesh, field, pot, path, title):
 
     t0 = time.perf_counter()
     m = drawable(mesh, PREVIEW_FACES)          # light mesh for drawing
-
-    def draw(ax, tris, normals, elev, azim):
-        draw_mesh(ax, tris, normals, pot, elev, azim)
-
     fig = plt.figure(figsize=(18, 11))
     ax = fig.add_subplot(2, 3, 1, projection="3d")
-    draw(ax, m.triangles, m.face_normals, 16, -60); ax.set_title("Outside")
+    draw_mesh(ax, m.triangles, m.face_normals, pot, 16, -60); ax.set_title("Outside")
     keep = m.triangles_center[:, 1] > 0                      # back half only -> cut-away
     ax = fig.add_subplot(2, 3, 2, projection="3d")
-    draw(ax, m.triangles[keep], m.face_normals[keep], 15, -90); ax.set_title("Cut-away")
+    draw_mesh(ax, m.triangles[keep], m.face_normals[keep], pot, 15, -90); ax.set_title("Cut-away")
 
     # vertical section straight from the field
     ax = fig.add_subplot(2, 3, 3)

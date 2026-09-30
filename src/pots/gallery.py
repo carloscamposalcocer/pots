@@ -12,7 +12,7 @@ Usage
     pots-gallery                         # every pattern -> docs/patterns/<name>.png
     pots-gallery hex slots               # only these
     pots-gallery quality=draft           # faster, coarser
-    pots-gallery size=big --images pics  # the 130 mm pot, images in pics/
+    pots-gallery size=big --images pics  # the 100 mm pot, images in pics/
     pots-gallery height=90 design.wall=5
     pots-gallery --shapes size=big       # only the pot shape sheet -> docs/shapes.png
                                          # (every shape built with the config's pattern)

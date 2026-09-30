@@ -21,7 +21,6 @@ def test_small_draft_pot_is_one_watertight_body(tmp_path):
     mesh.export(tmp_path / "pot.3mf")
 
 
-
 @pytest.mark.parametrize("name", ["voronoi", "weave", "louvers"])
 def test_narrow_band_field_meshes_the_same(name, monkeypatch):
     """The field skips the pattern (and the cup) far from the wall; that must
@@ -33,6 +32,7 @@ def test_narrow_band_field_meshes_the_same(name, monkeypatch):
     assert np.array_equal(fast.faces, full.faces)
     assert np.abs(fast.vertices - full.vertices).max() < 1e-4
     assert fast.is_watertight
+
 
 def test_loose_parts_are_reported(caplog, monkeypatch):
     """Ring-shaped holes cut out islands (what sank `coral`): the build warns."""
@@ -56,7 +56,7 @@ def test_pattern_has_no_loose_parts(name, caplog):
         mesh, _ = generate(pot, name, voxel=0.6, faces=60_000)
     assert "detached" not in caplog.text
     assert mesh.is_watertight and mesh.body_count == 1
-    assert overhang_share(mesh) < 0.12      # hex, the worst of the existing ones, is ~0.09
+    assert overhang_share(mesh) < 0.12
 
 
 @pytest.mark.slow

@@ -37,7 +37,7 @@ pots --help                           # usage and the list of patterns
 ```
 
 Settings use Hydra/OmegaConf syntax, so nested keys use dots
-(`design.wall=5`, `patterns.lattice.strut=2`) and a misspelled key is an error.
+(`design.wall=5`, `patterns.lattice.strut_in=2.5`) and a misspelled key is an error.
 
 ### Outputs
 
@@ -58,7 +58,7 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 |---|---|---|
 | `pattern` | `voronoi` | Wall pattern, see [Patterns](#patterns). |
 | `shape` | `tapered` | Pot profile, see [Pot shapes](#pot-shapes). |
-| `size` | `small` | Size preset: `big` or `small`, see [Size presets](#size-presets-srcpotsconfsize). |
+| `size` | `small` | Size preset: `big` or `small`, see [Size presets](#size-presets-srcpotsconfigsize). |
 | `height` | from `size` | Pot height in mm. **Drives the whole shape**, see [Scaling](#scaling-with-height). Minimum `base + rim + 10` (17.4 mm). |
 | `preview` | `true` | Also render the PNG preview (~10 s). |
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
@@ -120,14 +120,24 @@ Keys most patterns share:
 | Key | Description |
 |---|---|
 | `cells` | Cells around the pot at the 130 mm reference height; scaled with `height` (see [Scaling](#scaling-with-height)). More cells = smaller holes. |
-| `strut_in` | Tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`): strut width on the soil side (2.2 mm). Wider = smaller inner holes = less soil loss, less air. |
-| `strut_out` | Tapered patterns: strut width on the outside (1.1 mm). Keep ≥ ~1.1 (0.4 mm nozzle) and ≤ `strut_in` so holes widen outward. |
-| `center` | Tapered patterns, 0 to 1 (default 0). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex` and `isogrid` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice` have 55° roofs and barely change. |
+| `strut_in` | Tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`): strut width on the soil side (2.2 mm; `lattice` 3.0). Wider = smaller inner holes = less soil loss, less air. Keep ≥ ~1.1 (0.4 mm nozzle). |
+| `strut_out` | Tapered patterns: strut width on the outside (`voronoi` 0.5, `lattice` and `isogrid` 0.3, `hex` and `drops` 1.1 mm). Keep ≤ `strut_in` so holes widen outward. The strut is a wedge through the wall, so its outer edge may be thinner than the nozzle: the slicer just trims the tip and the outside holes get a little bigger. |
+| `center` | Tapered patterns, 0 to 1 (1 on `voronoi`, `drops`, `lattice`, `isogrid`; 0 on `hex`). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex` and `isogrid` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice` have 55° roofs and barely change. |
 
-With the defaults, `voronoi` is 58% open outside (typical hole
-3.6 mm) and 29% open on the soil side (typical hole 2.5 mm); `lattice` at
-2.2 / 1.1 mm struts is 57% (3.3 mm) and 27% (2.3 mm). The 55° roof slope and the warp frequencies
-are not settings: they keep the pot support-free and seamless.
+With the defaults, on the 100 mm pot (6 mm wall):
+
+| pattern | outside face | soil side |
+|---|---|---|
+| `voronoi` | 78% open, holes ~4.2 mm | 29% open, holes ~2.5 mm |
+| `hex` | 52%, ~3.2 mm | 25%, ~2.2 mm |
+| `drops` | 56%, ~4.4 mm | 34%, ~3.4 mm |
+| `lattice` | 85%, ~4.1 mm | 13%, ~1.6 mm |
+| `isogrid` | 85%, ~3.8 mm | 24%, ~2.1 mm |
+
+At 2.2 / 1.1 mm struts `voronoi` is 58% (3.6 mm) outside and 29% (2.5 mm)
+inside. `pots` logs these numbers for every build. The 55° roof slope and
+the warp frequencies are not settings: they keep the pot support-free and
+seamless.
 
 ## Scaling with height
 
@@ -165,8 +175,8 @@ the cup is filled to the lip.
 
 Every shape stays between the same narrowest and widest radius (56·k and
 72·k mm). The patterns are drawn for that range, so every pattern keeps its
-hole sizes, strut widths and 45° roofs on every shape (the voronoi wall stays
-58% / 29% open on all six). No wall leans more than 24° from vertical, and
+hole sizes, strut widths and 45° roofs on every shape (the voronoi wall is
+open about the same on all six). No wall leans more than 24° from vertical, and
 the cup follows the shape: it starts a moat gap out from the pot and its lip
 sits just outside the widest part of the wall above it.
 
@@ -216,10 +226,14 @@ replaces that. Run it after changing a pattern so the README stays current.
 The generator follows these; keep them when changing the code:
 
 - No supports anywhere.
-- Every hole roof is a flat bridge no wider than the hole (≤ ~5 mm). The
-  taper is done by shifting the pattern down as its edges recede, so holes
-  only grow sideways and downward; a ceiling never rises toward the outside.
-- Minimum strut ~1.1 mm (0.4 mm nozzle).
+- Every hole roof is a flat bridge no wider than the hole (≤ ~5 mm), or a
+  slope of at least 45°. The taper is done by shifting the pattern down as
+  its edges recede, so holes only grow sideways and downward; a ceiling
+  never rises toward the outside. The exception is a tapered pattern's
+  `center` setting, which trades that for centred holes (`pots` warns when
+  it tilts a flat bridge: `voronoi`, `hex`, `isogrid`).
+- Minimum strut ~1.1 mm (0.4 mm nozzle) on the soil side; a tapered strut
+  may thin below that toward the outside, where it is a wedge tip.
 - 45° chamfer on the bottom outer edge (elephant foot).
 - Every pattern is periodic around the circumference.
 

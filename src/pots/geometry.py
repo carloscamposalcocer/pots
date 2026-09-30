@@ -43,7 +43,7 @@ SHAPES = {
 @dataclass(frozen=True)
 class Pot:
     height: float = H_REF
-    wall: float = 6.0          # lattice wall thickness (radial)
+    wall: float = 6.0          # pot wall thickness (radial)
     rim: float = 5.0           # solid band at the top
     base: float = 2.4          # solid floor shared by pot and cup
     cup_wall: float = 2.4      # drip cup wall thickness

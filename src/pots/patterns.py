@@ -148,7 +148,7 @@ def _vor_corners(D, strut, fine):
     return out
 
 
-def _vor_sides(pot, per, step):
+def _vor_sides(per, step):
     """Sample angles (L, m) for one cell from its corners at each depth
     (`per`: [depth] -> [(j1, j2, angle)]), or None if the depths don't fit
     one order of sides. Every neighbour that borders the hole at some depth
@@ -199,10 +199,9 @@ def voronoi_cutters(pot, c, depths, step=np.deg2rad(24), fine=360, near=14):
     (_vor_sides); a cell whose depths don't fit that is sampled at fixed
     angles instead: the corners at the soil face, mid-wall and outer face
     and angles at most `step` apart. The points are then mapped back
-    through the warp. Cells
-    whose hole is closed at every depth are skipped; where a hole is closed
-    at some depths only (a blind pocket), its outline there shrinks to the
-    seed, where the field's hole closes."""
+    through the warp. Cells whose hole is closed at every depth are
+    skipped; where a hole is closed at some depths only (a blind pocket),
+    its outline there shrinks to the seed, where the field's hole closes."""
     nc, rh = pot.count(c.cells), c.row_h
     nr = int(pot.height / rh) + 3
     w = pot.circ / nc
@@ -230,7 +229,7 @@ def voronoi_cutters(pot, c, depths, step=np.deg2rad(24), fine=360, near=14):
 
     groups = {}                                                  # point count -> [(cell, angles (L, m))]
     for ci in range(len(own)):
-        ang = _vor_sides(pot, [corners[d][ci] for d in range(L)], step)
+        ang = _vor_sides([corners[d][ci] for d in range(L)], step)
         if ang is None:
             base = [a for d in sorted({0, L // 2, L - 1}) for _, _, a in corners[d][ci]]
             base = np.unique(np.round(np.mod(base, 2 * np.pi), 6))
@@ -347,8 +346,8 @@ def pat_hex(pot, P, th, Z, r, s):
     """Warped honeycomb, vertex pointing up, with the voronoi funnel: struts
     thin from strut_in to strut_out through the wall. The roof edges have a
     vertical normal component of sqrt(3)/2, so the pattern moves down by
-    recession / (sqrt(3)/2) to keep every roof where it is. strut_extra makes up for the warp, which
-    shears the cells and thins some struts."""
+    recession / (sqrt(3)/2) to keep every roof where it is. strut_extra
+    makes up for the warp, which shears the cells and thins some struts."""
     c = P.hex
     strut = taper(c, s) + c.strut_extra
     shift = taper_shift(c, s, np.sqrt(3) / 2, c.strut_extra)
@@ -405,9 +404,10 @@ def pat_lattice(pot, P, th, Z, r, s):
 
 def lattice_cutters(pot, c, depths):
     """The lattice holes for solid.py: (n, len(depths), 4, 2) diamonds in the
-    unrolled (S, Z) plane at each of `depths`. Each hole is the diamond between strips k, k+1 of one set
-    (u = S + Z cot) and m, m+1 of the other (v = S - Z cot), minus half a
-    strut on every side, moved down like lattice_dist. None if the holes
+    unrolled (S, Z) plane at each of `depths`. Each hole is the diamond
+    between strips k, k+1 of one set (u = S + Z cot) and m, m+1 of the
+    other (v = S - Z cot), minus half a strut on every side, moved down
+    like lattice_dist. None if the holes
     close up somewhere (a loft can't do that; the field can)."""
     n = pot.count(c.cells)
     p = pot.circ / n

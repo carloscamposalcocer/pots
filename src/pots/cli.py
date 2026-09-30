@@ -7,8 +7,8 @@ you change, as key=value (Hydra syntax, nested keys use dots).
 Examples
     pots                              # quick draft build with the defaults (size=small)
     pots quality=full                 # print-quality mesh (the file you print)
-    pots size=big                     # the 130 mm reference pot
-    pots size=big height=100          # start from a preset, change one value
+    pots size=big                     # the 100 mm pot
+    pots size=big height=120          # start from a preset, change one value
     pots pattern=hex                  # another pattern
     pots shape=barrel                 # another pot shape
     pots design.wall=4                # thinner wall (mm, does not scale)
@@ -77,10 +77,12 @@ BRIDGE_ROOFS = {"voronoi", "hex", "isogrid"}
 
 
 def check_pattern_params(cfg):
-    """Warn about pattern settings that won't print well."""
+    """Warn about pattern settings that won't print well. A tapered strut is
+    a wedge through the wall, so only its soil side (strut_in) has to be
+    printable; a thinner outer edge is just trimmed by the slicer."""
     for name in (cfg.pattern, *PATTERNS[cfg.pattern].uses):
         c = cfg.patterns[name]
-        for key in ("strut", "strut_out"):
+        for key in ("strut", "strut_in"):
             if key in c and c[key] < 1.1:
                 log.warning("patterns.%s.%s=%.2f mm is below ~1.1 mm, too thin for a 0.4 mm nozzle",
                             name, key, c[key])

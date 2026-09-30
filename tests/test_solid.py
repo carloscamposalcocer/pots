@@ -98,7 +98,7 @@ def test_voronoi_blind_pockets():
 @pytest.mark.parametrize("shape", SHAPES)
 @pytest.mark.parametrize("h", [30, 65])
 def test_solid_every_shape_and_size(name, shape, h):
-    pot = Pot(height=h, wall=4.0 if h < 100 else 6.0, shape=shape)
+    pot = Pot(height=h, wall=4.0, shape=shape)
     holes = PATTERNS[name].cutters(pot, getattr(load_params(), name), depths(pot))
     mesh = build_solid(pot, holes)
     assert mesh.is_watertight and mesh.body_count == 1

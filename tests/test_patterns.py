@@ -48,8 +48,12 @@ def test_unknown_pattern_setting_is_rejected():
 
 def test_warns_about_thin_struts(caplog):
     with caplog.at_level(logging.WARNING, logger="pots"):
-        pot_from_config(load_config(["pattern=lattice", "patterns.lattice.strut_out=0.8"]))
+        pot_from_config(load_config(["pattern=lattice", "patterns.lattice.strut_in=0.8"]))
     assert "too thin" in caplog.text
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="pots"):
+        pot_from_config(load_config(["pattern=lattice"]))       # a thin outer edge is fine
+    assert "too thin" not in caplog.text
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="pots"):
         pot_from_config(load_config(["pattern=voronoi", "patterns.voronoi.strut_out=3"]))
