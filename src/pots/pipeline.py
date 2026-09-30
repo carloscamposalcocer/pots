@@ -25,7 +25,7 @@ def generate(pot, pattern, voxel, faces, params=None, mesher="auto"):
         holes = cutters(pot, getattr(load_params(params), pattern), depths(pot))
         if holes is not None:
             log.info("building '%s' exactly (solid)", pattern)
-            return build_solid(pot, *holes), field
+            return build_solid(pot, holes), field
         log.info("'%s' holes close up inside the wall with these settings; using marching cubes", pattern)
     log.info("meshing '%s' at %.3f mm", pattern, voxel)
     raw = build(field, pot.r_max, pot.height, voxel)

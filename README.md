@@ -63,7 +63,7 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 | `preview` | `true` | Also render the PNG preview (~10 s). |
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `draft` | Mesh quality preset: `draft` (fast check) or `full` (for printing). |
-| `mesher` | `auto` | `auto`: exact geometry for the patterns that support it (`lattice` so far), marching cubes for the others. `sdf`: marching cubes for every pattern. See [How the mesh is made](#how-the-mesh-is-made). |
+| `mesher` | `auto` | `auto`: exact geometry for the patterns that support it (the tapered ones: `voronoi`, `hex`, `drops`, `lattice`, `isogrid`), marching cubes for the others. `sdf`: marching cubes for every pattern. See [How the mesh is made](#how-the-mesh-is-made). |
 
 ### Size presets (`src/pots/config/size/`)
 
@@ -86,7 +86,8 @@ command line still wins, so `size=big height=110` is a big pot made
 The default is `draft`, which is too coarse to print: build the final file
 with `quality=full`. You can also override a single value:
 `quality=full quality.voxel=0.4`. The quality settings only apply to
-marching cubes: an exactly built pattern (`lattice`) is the same, print
+marching cubes (`louvers`, `slots`, `spiral`, `chevrons`, `weave`, or any
+pattern with `mesher=sdf`): an exactly built pattern is the same, print
 ready mesh at any quality.
 
 ### Design sizes (`design.*`, mm)
@@ -264,7 +265,7 @@ grid can't follow a sharp edge that runs across it: flat ribs come out
 with sawtooth edges, and it takes many triangles.
 
 Patterns whose holes are polygons can also give their hole outlines
-directly (`Pattern.cutters`; `lattice` so far). Then `solid.py` builds the
+directly (`Pattern.cutters`; the tapered ones: `voronoi`, `hex`, `drops`, `lattice`, `isogrid`). Then `solid.py` builds the
 pot exactly with [manifold3d](https://github.com/elalish/manifold): the
 plain pot is revolved from its profile, each hole is a loft from its
 soil-side outline to its outside one, and all holes are subtracted at

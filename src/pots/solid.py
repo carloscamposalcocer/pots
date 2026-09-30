@@ -1,17 +1,18 @@
 """
-Exact pot mesh for patterns whose holes are polygons (lattice so far), built
-with manifold3d instead of marching cubes: the plain pot is a revolved
-profile and the holes are lofted cutters, subtracted in one go. Flat faces
-stay flat and edges stay sharp, with a small fraction of the triangles.
+Exact pot mesh for patterns whose holes can be outlined (lattice, isogrid,
+drops, hex, voronoi), built with manifold3d instead of marching cubes: the
+plain pot is a revolved profile and the holes are lofted cutters,
+subtracted in one go. Flat faces stay flat and edges stay sharp, with a
+small fraction of the triangles.
 
-A pattern opts in with `Pattern.cutters(pot, c, depths)`: it returns
-(outlines, disjoint). `outlines` is an (n, len(depths), m, 2) array of hole
-outlines in the unrolled (S, Z) plane (mm, S = theta * r0), one per depth s
-(0 soil side, 1 outside) in `depths`. Point i of one outline must move to
-point i of the next along a straight line in (S, Z, s) as s grows, which
-holds for the tapered patterns (strut width and shift are linear in s).
-Each hole is then the loft through its outlines. `disjoint`: no two holes
-touch at any of the depths, so they can be cut as one mesh.
+A pattern opts in with `Pattern.cutters(pot, c, depths)`: it returns the
+hole outlines in the unrolled (S, Z) plane (mm, S = theta * r0), one per
+depth s (0 soil side, 1 outside) in `depths`, as an (n, len(depths), m, 2)
+array or a list of such arrays (holes with different point counts), or
+None when it can't (holes that close up inside the wall). Each outline must
+be star-shaped around its centroid, and point i of one outline must be
+point i of the next: the hole is the loft through its outlines. The holes
+may touch or overlap (they are then merged first, which is slower).
 
 The first and last depth lie PAST mm beyond the wall faces (the outlines
 are extended past the faces, where they change nothing), so no cutter
@@ -152,29 +153,66 @@ def _lofts(pot, outlines, s):
     return verts, faces
 
 
-def build_solid(pot, outlines, disjoint=True):
+def _groups(outlines):
+    """The outlines as a list of non-empty (n, L, m, 2) float arrays."""
+    if outlines is None:
+        return []
+    if not isinstance(outlines, (list, tuple)):
+        outlines = [outlines]
+    return [np.array(g, float) for g in outlines if len(g)]
+
+
+def _disjoint(pot, groups):
+    """True if no two holes overlap at any depth, around the seam too:
+    then the union of the outlines has the sum of their areas."""
+    from manifold3d import CrossSection
+    L = groups[0].shape[1]
+    for d in sorted({0, L // 2, L - 1}):
+        polys, total = [], 0.0
+        for g in groups:
+            P = g[:, d]                                       # (n, m, 2)
+            x, y = P[..., 0], P[..., 1]
+            area = (x * np.roll(y, -1, 1) - y * np.roll(x, -1, 1)).sum(1) / 2
+            P = np.where((area < 0)[:, None, None], P[:, ::-1], P)     # counter-clockwise
+            # copies across the seam, so holes there are checked against each other
+            edge = np.abs(x).max(1) > pot.circ / 2 - 20
+            P = np.concatenate([P, P[edge] - (pot.circ, 0), P[edge] + (pot.circ, 0)])
+            total += np.abs(area).sum() + 2 * np.abs(area[edge]).sum()
+            polys += list(P)
+        if CrossSection(polys).area() < total * (1 - 1e-7) - 1e-6:
+            return False
+    return True
+
+
+def build_solid(pot, outlines):
     """The pot with holes `outlines`, given at depths(pot) (see the module
-    doc), as a trimesh. `disjoint`: the holes never touch, so they can be cut
-    as one mesh; otherwise each is a separate solid and they are merged first."""
+    doc), as a trimesh."""
     from manifold3d import Manifold, Mesh, OpType
     t0 = time.perf_counter()
     body = _revolve(_profile(pot), pot.r_max)
     s = depths(pot)
-    if len(outlines):
-        verts, faces = _lofts(pot, np.array(outlines, float), s)
-        if disjoint:
+    groups = _groups(outlines)
+    n = sum(len(g) for g in groups)
+    if groups:
+        lofts = [_lofts(pot, g, s) for g in groups]
+        if _disjoint(pot, groups):
+            off = np.cumsum([0] + [len(v) for v, _ in lofts])
+            verts = np.concatenate([v for v, _ in lofts])
+            faces = np.concatenate([f + o for (_, f), o in zip(lofts, off)])
             holes = Manifold(Mesh(verts.astype(np.float32), faces.astype(np.uint32)))
         else:
-            per = len(faces) // len(outlines)
-            nv = len(verts) // len(outlines)
-            holes = Manifold.batch_boolean(
-                [Manifold(Mesh(verts[k * nv:(k + 1) * nv].astype(np.float32),
-                               (faces[k * per:(k + 1) * per] - k * nv).astype(np.uint32)))
-                 for k in range(len(outlines))], OpType.Add)
+            log.info("some holes touch; merging them first")
+            parts = []
+            for (v, f), g in zip(lofts, groups):
+                nv, nf = len(v) // len(g), len(f) // len(g)
+                parts += [Manifold(Mesh(v[k * nv:(k + 1) * nv].astype(np.float32),
+                                        (f[k * nf:(k + 1) * nf] - k * nv).astype(np.uint32)))
+                          for k in range(len(g))]
+            holes = Manifold.batch_boolean(parts, OpType.Add)
         if holes.status().name != "NoError":
             raise RuntimeError(f"hole cutters are not a valid solid: {holes.status()}")
         body = body - (holes ^ _clip(pot))
-    log.info("%d holes", len(outlines))
+    log.info("%d holes", n)
     m = body.to_mesh()
     mesh = trimesh.Trimesh(m.vert_properties[:, :3], m.tri_verts, process=True)
     log.info("solid mesh: %s faces in %.1f s", f"{len(mesh.faces):,}", time.perf_counter() - t0)

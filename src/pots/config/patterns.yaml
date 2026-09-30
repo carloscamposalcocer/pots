@@ -36,7 +36,7 @@ patterns:
     seed: 7           # random seed: another number gives another cell layout
     warp: 1.2         # sideways wobble of the cells (amplitude)
     strut_in: 2.2     # 2.2 -> ~29% open, ~2.5 mm holes on the soil side
-    strut_out: 1.1    # 1.1 -> ~58% open, ~3.6 mm holes outside
+    strut_out: 0.5    # 1.1 -> ~58% open, ~3.6 mm holes outside
     center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   hex:
@@ -58,13 +58,13 @@ patterns:
   lattice:
     cells: 72         # 72 -> strips 4.6 mm apart
     strut_in: 3     # 2.2 -> ~27% open, ~2.3 mm holes on the soil side
-    strut_out: 0.5    # 1.1 -> ~57% open, ~3.3 mm holes outside
+    strut_out: 0.3    # 1.1 -> ~57% open, ~3.3 mm holes outside
     center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   isogrid:
     cells: 54         # 54 -> ~7.4 mm triangle sides
     strut_in: 2.2
-    strut_out: 1.1
+    strut_out: 0.3
     center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   louvers:

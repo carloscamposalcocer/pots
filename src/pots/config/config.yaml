@@ -61,9 +61,10 @@ shape: tapered
 # height (mm) comes from the size preset (config/size/); see there.
 
 # mesher: how the mesh is made.
-#   auto  exact geometry (flat faces, sharp edges, few triangles, a few
-#         seconds) for the patterns that support it (lattice), marching
-#         cubes at quality.voxel / quality.faces for the others.
+#   auto  exact geometry (flat faces, sharp edges, fewer triangles, a
+#         few seconds) for the patterns that support it (voronoi, hex,
+#         drops, lattice, isogrid), marching cubes at quality.voxel /
+#         quality.faces for the others.
 #   sdf   marching cubes for every pattern (the old way, for comparison).
 mesher: auto
 

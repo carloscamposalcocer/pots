@@ -37,7 +37,7 @@ class Pattern(NamedTuple):
     fn: Callable
     description: str
     uses: tuple = ()              # other patterns whose settings it also reads
-    cutters: Callable = None      # exact hole outlines for solid.py, (pot, c, depths) -> (outlines, disjoint)
+    cutters: Callable = None      # exact hole outlines for solid.py, (pot, c, depths) -> outlines or None
 
 
 def load_params(params=None):
@@ -109,6 +109,160 @@ def voronoi_edge(pot, c, S, ZZ):
     return (f2 - f1) / 2
 
 
+def _vor_reach(D, strut, U):
+    """Distance from a seed along the unit directions U (..., k, 2) to the
+    edge of its hole: for each neighbour at offset d (D: (..., 1, j, 2)) the
+    point p = t u where |p - d| - |p| = strut is at
+    t = (|d|^2 - strut^2) / (2 (u . d + strut)); the hole ends at the nearest.
+    A neighbour closer than the strut closes the hole (t = 0: F2 - F1 is
+    at most |d| everywhere, and largest at the seed)."""
+    num = (D * D).sum(-1) - strut ** 2
+    ud = (U[..., :, None, :] * D).sum(-1) + strut
+    t = np.where(ud > 1e-12, num / (2 * np.where(ud > 1e-12, ud, 1.0)), np.inf)
+    return np.maximum(np.where(num > 0, t, 0.0).min(-1), 0.0)
+
+
+def _vor_corners(D, strut, fine):
+    """For each cell (offsets D: (n, j, 2)) at one strut width: its hole's
+    corners, where the nearest neighbour changes, as a list of
+    [(neighbour before, neighbour after, angle), ...] sorted by angle."""
+    phi = np.linspace(0, 2 * np.pi, fine, endpoint=False)
+    U = np.c_[np.cos(phi), np.sin(phi)]
+    ud = (U[None, :, None, :] * D[:, None]).sum(-1) + strut
+    num = (D * D).sum(-1)[:, None] - strut ** 2
+    T = np.where(ud > 1e-12, num / (2 * np.where(ud > 1e-12, ud, 1.0)), np.inf)
+    T = np.where(num > 0, T, 0.0)
+    near = T.argmin(-1)                                          # (n, fine) nearest edge's neighbour
+    cell, k = np.nonzero(near != np.roll(near, -1, 1))
+    j1, j2 = near[cell, k], near[cell, (k + 1) % fine]
+    a, b = phi[k], phi[k] + 2 * np.pi / fine
+    for _ in range(30):                                          # bisect: where both neighbours tie
+        m = (a + b) / 2
+        u = np.c_[np.cos(m), np.sin(m)][:, None]
+        first = _vor_reach(D[cell, j1][:, None, None], strut, u)[:, 0] < \
+            _vor_reach(D[cell, j2][:, None, None], strut, u)[:, 0]
+        a, b = np.where(first, m, a), np.where(first, b, m)
+    out = [[] for _ in range(len(D))]
+    for ci, x, y, ang in zip(cell, j1, j2, (a + b) / 2):
+        out[ci].append((x, y, ang))
+    return out
+
+
+def _vor_sides(pot, per, step):
+    """Sample angles (L, m) for one cell from its corners at each depth
+    (`per`: [depth] -> [(j1, j2, angle)]), or None if the depths don't fit
+    one order of sides. Every neighbour that borders the hole at some depth
+    gets a side, in the order of the depth with the most sides; where it
+    doesn't border it yet, its side is the corner between its neighbours,
+    which is where it grows out of. Each side gets ceil(widest / step)
+    points from its first corner on."""
+    seqs = [[j2 for _, j2, _ in p] for p in per]                # the side after each corner
+    master = max(seqs, key=len)
+    if len(master) < 3 or len(set(master)) != len(master):
+        return None
+    pos = {j: i for i, j in enumerate(master)}
+    for q in seqs:                                               # each must follow master's cyclic order
+        if not q or any(j not in pos for j in q):
+            return None
+        idx = [pos[j] for j in q]
+        k = idx.index(min(idx))
+        if idx[k:] + idx[:k] != sorted(idx):
+            return None
+    n = len(master)
+    starts = np.empty((len(per), n))
+    spans = np.empty((len(per), n))
+    for d, p in enumerate(per):
+        start = {j2: a for _, j2, a in p}                        # side j2 starts at its corner
+        end = {j1: a for j1, _, a in p}
+        present = [j for j in master if j in start]
+        for i, j in enumerate(master):
+            if j in start:
+                starts[d, i] = start[j]
+                spans[d, i] = np.mod(end[j] - start[j], 2 * np.pi)
+            else:                                                # the corner after the previous side there
+                prev = next(master[(i - k) % n] for k in range(1, n + 1) if master[(i - k) % n] in start)
+                starts[d, i] = end[prev]
+                spans[d, i] = 0.0
+        if len(present) == 1:
+            return None
+    pieces = np.maximum(1, np.ceil(spans.max(0) / step)).astype(int)
+    return np.concatenate([starts[:, [i]] + spans[:, [i]] * np.arange(k) / k for i, k in enumerate(pieces)], 1)
+
+
+def voronoi_cutters(pot, c, depths, step=np.deg2rad(24), fine=360, near=14):
+    """The voronoi holes for solid.py: a list of (n, len(depths), m, 2)
+    outlines in the unrolled (S, Z) plane, grouped by point count m. In
+    voronoi_edge's warped coordinates, a hole is where (F2 - F1) exceeds the
+    strut: from its seed, the distance to the edge at each angle comes from
+    _vor_reach, and the sides are hyperbola arcs, one per neighbour. The
+    outline has the exact corners at each depth and points along each side
+    (_vor_sides); a cell whose depths don't fit that is sampled at fixed
+    angles instead: the corners at the soil face, mid-wall and outer face
+    and angles at most `step` apart. The points are then mapped back
+    through the warp. Cells
+    whose hole is closed at every depth are skipped; where a hole is closed
+    at some depths only (a blind pocket), its outline there shrinks to the
+    seed, where the field's hole closes."""
+    nc, rh = pot.count(c.cells), c.row_h
+    nr = int(pot.height / rh) + 3
+    w = pot.circ / nc
+    jit = _vor_jitter(nr, nc, c.jitter, c.seed)
+    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
+    depths = np.asarray(depths)
+    strut = np.array([taper(c, s) for s in depths])
+    shift = np.array([taper_shift(c, s, 1.0) for s in depths])
+    # seeds as in voronoi_edge: row jr at z = (jr - 0.5 + jitter) rh
+    def seed(jr, i):
+        return np.stack([(i + 0.5 + jit[jr, i % nc, 0]) * w, (jr - 0.5 + jit[jr, i % nc, 1]) * rh], -1)
+    margin = 2 * rh + np.abs(shift).max()
+    rows = [jr for jr in range(nr) if lo - margin < (jr - 0.5) * rh < hi + margin]
+    JR, I = [x.ravel() for x in np.meshgrid(rows, np.arange(nc), indexing="ij")]
+    own = seed(JR, I)                                            # (n, 2)
+    offs = [(dj, di) for dj in range(-2, 3) for di in range(-3, 4) if (dj, di) != (0, 0)]
+    # neighbours in rows that don't exist are far away (the field doesn't have them either)
+    D = np.stack([np.where(((JR + dj >= 0) & (JR + dj < nr))[:, None],
+                           seed(np.clip(JR + dj, 0, nr - 1), I + di), 1e6) for dj, di in offs], 1)
+    D = D - own[:, None]                                         # (n, j, 2)
+    # only the nearest seeds can border a hole (a farther one's edge lies beyond theirs)
+    D = np.take_along_axis(D, np.argsort((D * D).sum(-1), 1)[:, :near, None], 1)
+    L = len(depths)
+    corners = [_vor_corners(D, strut[d], fine) for d in range(L)]     # [depth][cell] -> [(j1, j2, angle)]
+
+    groups = {}                                                  # point count -> [(cell, angles (L, m))]
+    for ci in range(len(own)):
+        ang = _vor_sides(pot, [corners[d][ci] for d in range(L)], step)
+        if ang is None:
+            base = [a for d in sorted({0, L // 2, L - 1}) for _, _, a in corners[d][ci]]
+            base = np.unique(np.round(np.mod(base, 2 * np.pi), 6))
+            if len(base) < 3:
+                continue
+            gaps = np.diff(np.r_[base, base[0] + 2 * np.pi])
+            fill = [a0 + g * np.arange(1, int(np.ceil(g / step))) / np.ceil(g / step) for a0, g in zip(base, gaps)]
+            ang = np.sort(np.mod(np.r_[base, np.concatenate(fill)], 2 * np.pi))
+            ang = np.broadcast_to(ang, (L, len(ang)))
+        groups.setdefault(ang.shape[1], []).append((ci, ang))
+
+    out = []
+    for m, cells in groups.items():
+        idx = np.array([ci for ci, _ in cells])
+        ang = np.stack([a for _, a in cells])                    # (g, L, m)
+        U = np.stack([np.cos(ang), np.sin(ang)], -1)             # (g, L, m, 2)
+        t = np.stack([_vor_reach(D[idx][:, None], strut[d], U[:, d]) for d in range(L)], 1)   # (g, L, m)
+        # the first and last seed rows have no neighbours beyond them; their
+        # holes run off there, outside the pattern band (the clip cuts them off)
+        t = np.minimum(t, 3 * max(w, rh))
+        # closed at a depth: a tiny outline at the seed (0.01 mm, far below what prints)
+        some = (t.min(-1) > 0.01).any(1)
+        t, U, idx = np.maximum(t[some], 0.01), U[some], idx[some]
+        Sw = own[idx, None, None, 0] + t * U[..., 0]
+        Zw = own[idx, None, None, 1] + t * U[..., 1]
+        Z = Zw - shift[None, :, None]                            # voronoi_edge gets Z + shift ...
+        S = Sw - c.warp * np.sin(2 * np.pi * Z / 47)             # ... and S + warp sin(2 pi Z / 47)
+        keep = (Z.max((1, 2)) > lo) & (Z.min((1, 2)) < hi)
+        out.append(np.stack([S, Z], -1)[keep])
+    return out
+
+
 def pat_voronoi(pot, P, th, Z, r, s):
     """Voronoi cells shaped like funnels: small on the soil side, wide outside.
     Struts thin from strut_in to strut_out through the wall. The pattern is
@@ -143,6 +297,50 @@ def hex_edge(pot, c, th, Z, shift=0.0):
         hexd = np.where(d2 < best, h, hexd)
         best = np.minimum(best, d2)
     return hexd, a / 2
+
+
+def hex_cutters(pot, c, depths, per_edge=2):
+    """The hex holes for solid.py: (n, len(depths), 6 per_edge, 2) outlines in
+    the unrolled (S, Z) plane. In hex_edge's warped coordinates a hole is a
+    regular pointy-top hexagon of apothem a/2 - strut/2 around each cell
+    centre; `per_edge` points along each side are mapped back through the
+    warp (by fixed-point iteration), which bends the sides like the field
+    does. None if a hole closes up."""
+    n = pot.count(c.cells)
+    a = pot.circ / n
+    b = 3 * a / np.sqrt(3)                       # row pitch of one sub-lattice (3 x circumradius)
+    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
+    strut = np.array([taper(c, s) + c.strut_extra for s in depths])
+    shift = np.array([taper_shift(c, s, np.sqrt(3) / 2, c.strut_extra) for s in depths])
+    R = a / 2 - strut / 2                        # hex metric of the hole edge
+    if (R < 0.02).any():
+        return None
+    # unit hexagon (metric 1): top vertex first, clockwise, per_edge points per side
+    v = np.array([(0, 2), (1, 1), (1, -1), (0, -2), (-1, -1), (-1, 1)]) * [1, 1 / np.sqrt(3)]
+    t = np.arange(per_edge)[:, None] / per_edge
+    hexagon = np.concatenate([v[i] * (1 - t) + v[(i + 1) % 6] * t for i in range(6)])
+    # cell centres in warped coordinates: two sub-lattices, (ox + a/2 + i a, oz + b/2 + j b)
+    margin = b + np.abs(shift).max() + c.warp_z + 2
+    j = np.arange(np.floor((lo - margin) / b) - 1, np.ceil((hi + margin) / b) + 1)
+    J, I = [x.ravel() for x in np.meshgrid(j, np.arange(n), indexing="ij")]
+    cs = np.concatenate([a / 2 + I * a, a + I * a])
+    cz = np.concatenate([b / 2 + J * b, b + J * b])
+    keep = (cz > lo - margin) & (cz < hi + margin)
+    cs, cz = cs[keep], cz[keep]
+    # warped outline points (n, L, m) ...
+    Sw = cs[:, None, None] + R[None, :, None] * hexagon[None, None, :, 0]
+    Zw = cz[:, None, None] + R[None, :, None] * hexagon[None, None, :, 1]
+    # ... mapped back: S' = S + warp sin(2 pi Z / 38 + 3 th), Z' = Z + warp_z sin(5 th) + shift
+    S, Z = Sw.copy(), Zw - shift[None, :, None]
+    for _ in range(60):
+        th = S / pot.r0
+        Z = Zw - shift[None, :, None] - c.warp_z * np.sin(5 * th)
+        S = Sw - c.warp * np.sin(2 * np.pi * Z / 38 + 3 * th)
+    th = S / pot.r0
+    err = np.abs(S + c.warp * np.sin(2 * np.pi * Z / 38 + 3 * th) - Sw).max()
+    if err > 1e-6:
+        raise RuntimeError(f"hex warp inversion did not converge ({err:.2g} mm)")
+    return np.stack([S, Z], -1)
 
 
 def pat_hex(pot, P, th, Z, r, s):
@@ -206,9 +404,8 @@ def pat_lattice(pot, P, th, Z, r, s):
 
 
 def lattice_cutters(pot, c, depths):
-    """The lattice holes for solid.py: (outlines, disjoint), outlines being
-    (n, len(depths), 4, 2) diamonds in the unrolled (S, Z) plane at each of
-    `depths`. Each hole is the diamond between strips k, k+1 of one set
+    """The lattice holes for solid.py: (n, len(depths), 4, 2) diamonds in the
+    unrolled (S, Z) plane at each of `depths`. Each hole is the diamond between strips k, k+1 of one set
     (u = S + Z cot) and m, m+1 of the other (v = S - Z cot), minus half a
     strut on every side, moved down like lattice_dist. None if the holes
     close up somewhere (a loft can't do that; the field can)."""
@@ -240,7 +437,7 @@ def lattice_cutters(pot, c, depths):
             u, v = uc + du, vc + dv
             out[:, i, j, 0] = (u + v) / 2
             out[:, i, j, 1] = (u - v) / (2 * cot) - shift[i]
-    return out, bool((w > 0).all())
+    return out
 
 
 def pat_louvers(pot, P, th, Z, r, s):
@@ -287,6 +484,40 @@ def pat_drops(pot, P, th, Z, r, s):
     return hole
 
 
+def drops_cutters(pot, c, depths, arc=16):
+    """The drops holes for solid.py: (n, len(depths), arc + 1, 2) teardrops in
+    the unrolled (S, Z) plane. A teardrop is its circle (radius R) plus the
+    cap between the two SLOPE lines tangent to it: the apex at R / cos(SLOPE)
+    above the centre, then `arc` points around the bottom of the circle from
+    one tangent point (90 - SLOPE degrees above the horizontal) to the
+    other. None if a hole closes up."""
+    n = pot.count(c.cells)
+    p = pot.circ / n
+    rowh = p * c.row
+    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
+    R = np.array([(p - taper(c, s)) / 2 for s in depths])
+    if (R < 0.02).any():
+        return None
+    shift = np.array([taper_shift(c, s, np.cos(SLOPE)) for s in depths])
+    a0 = np.pi / 2 - SLOPE                                   # tangent point, above the horizontal
+    ang = np.linspace(a0, a0 - (np.pi + 2 * a0), arc)        # clockwise, under the centre, to the other one
+    # points a little outside the circle, so the chords straddle it instead of cutting inside
+    bulge = 2 / (1 + np.cos((ang[0] - ang[1]) / 2))
+    unit = np.c_[np.cos(ang), np.sin(ang)] * bulge
+    shape = np.concatenate([[[0, 1 / np.cos(SLOPE)]], unit])    # (arc + 1, 2), for R = 1
+    margin = rowh + np.abs(shift).max() + p
+    j = np.arange(np.floor((lo - margin) / rowh), np.ceil((hi + margin) / rowh) + 1)
+    J, I = [x.ravel() for x in np.meshgrid(j, np.arange(n), indexing="ij")]
+    Sc = np.mod(J, 2) * p / 2 + p / 2 + I * p                  # px = 0 in pat_drops
+    Zc = (J + 0.5) * rowh
+    keep = (Zc > lo - margin) & (Zc < hi + margin)
+    Sc, Zc = Sc[keep], Zc[keep]
+    out = shape[None, None] * R[None, :, None, None]           # (1, L, arc + 1, 2)
+    out = out + np.stack([np.broadcast_to(Sc[:, None], (len(Sc), len(depths))),
+                          Zc[:, None] - shift[None]], -1)[:, :, None]
+    return out
+
+
 def pat_spiral(pot, P, th, Z, r, s):
     """Slots along a many-start helix, staggered between neighbouring
     helices. Slot ends are cut level (a short flat bridge). The helix count
@@ -330,6 +561,51 @@ def pat_isogrid(pot, P, th, Z, r, s):
     return strut / 2 - np.minimum.reduce([d0, d1, d2])
 
 
+def isogrid_cutters(pot, c, depths):
+    """The isogrid holes for solid.py: (n, len(depths), 3, 2) triangles in the
+    unrolled (S, Z) plane. In the lattice (strut 0, no shift) the level lines
+    are z = k h and the 60-degree ones u1 = S + z cot60 = m a and
+    u2 = S - z cot60 = n a. Row k has upward triangles (floor z = k h, sides
+    u2 = n a and u1 = (n + k + 1) a) and downward ones (roof z = (k + 1) h,
+    sides u1 = m a and u2 = (m - k) a). Each side moves in by half a strut
+    and each strut set down by its own shift, as in pat_isogrid. None if a
+    triangle closes up."""
+    N = pot.count(c.cells)
+    a = pot.circ / N
+    h = a * np.sqrt(3) / 2
+    r3 = np.sqrt(3)
+    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
+    st = np.array([taper(c, s) for s in depths])
+    sh0 = np.array([taper_shift(c, s, 1.0) - taper_shift(c, 0.0, 1.0) for s in depths])
+    sh60 = np.array([taper_shift(c, s, 0.5) - taper_shift(c, 0.0, 0.5) for s in depths])
+    w0, w60 = st / 2, st / r3                     # half strut: in z, and along u
+    margin = h + np.abs(np.r_[sh0, sh60]).max()
+    k = np.arange(np.floor((lo - margin) / h), np.ceil((hi + margin) / h) + 1)
+    K, I = [x.ravel()[:, None] for x in np.meshgrid(k, np.arange(N), indexing="ij")]   # (T, 1)
+    # upward: floor Z = k h + w0 - sh0; left side u2 = n a + w60; right side u1 = (n + k + 1) a - w60
+    zb = K * h + w0 - sh0
+    c1, c2 = (I + K + 1) * a - w60, I * a + w60
+    q = (c1 - c2) / 2                             # at the apex, (Z + sh60) cot60 = q
+    up = np.stack([np.stack([c2 + (zb + sh60) / r3, zb], -1),
+                   np.stack([c1 - (zb + sh60) / r3, zb], -1),
+                   np.stack([c2 + q, r3 * q - sh60], -1)], 2)
+    # downward: roof Z = (k + 1) h - w0 - sh0; left side u1 = m a + w60; right side u2 = (m - k) a - w60
+    zt = (K + 1) * h - w0 - sh0
+    c1, c2 = I * a + w60, (I - K) * a - w60
+    q = (c1 - c2) / 2
+    down = np.stack([np.stack([c1 - (zt + sh60) / r3, zt], -1),
+                     np.stack([c2 + (zt + sh60) / r3, zt], -1),
+                     np.stack([c2 + q, r3 * q - sh60], -1)], 2)
+    out = np.concatenate([up, down])              # (2T, L, 3, 2)
+    z = out[..., 1]
+    keep = (z.max((1, 2)) > lo) & (z.min((1, 2)) < hi)
+    out = out[keep]
+    size = np.abs(out[:, :, 0, 1] - out[:, :, 2, 1])   # height of each triangle at each depth
+    if (size < 0.02).any():
+        return None
+    return out
+
+
 def pat_chevrons(pot, P, th, Z, r, s):
     """Stacked arrowheads: two SLOPE arms meeting at the top, so every roof
     slopes or is a point."""
@@ -368,12 +644,13 @@ def pat_weave(pot, P, th, Z, r, s):
 
 
 PATTERNS = {
-    "voronoi": Pattern("2d", pat_voronoi, "organic cells flaring outward like funnels (default)"),
-    "hex": Pattern("2d", pat_hex, "warped honeycomb, pointy-top cells, flaring outward"),
-    "drops": Pattern("2d", pat_drops, "staggered teardrops flaring outward"),
+    "voronoi": Pattern("2d", pat_voronoi, "organic cells flaring outward like funnels (default)",
+                       cutters=voronoi_cutters),
+    "hex": Pattern("2d", pat_hex, "warped honeycomb, pointy-top cells, flaring outward", cutters=hex_cutters),
+    "drops": Pattern("2d", pat_drops, "staggered teardrops flaring outward", cutters=drops_cutters),
     "lattice": Pattern("2d", pat_lattice, "diamond trellis of crossing helical strips, flaring outward",
                        cutters=lattice_cutters),
-    "isogrid": Pattern("2d", pat_isogrid, "triangle grid, flaring outward"),
+    "isogrid": Pattern("2d", pat_isogrid, "triangle grid, flaring outward", cutters=isogrid_cutters),
     "louvers": Pattern("2d", pat_louvers, "gills sloping down and out, no line of sight"),
     "slots": Pattern("2d", pat_slots, "narrow wavy vertical slots, air-pruning style"),
     "spiral": Pattern("2d", pat_spiral, "slots on a many-start helix"),
