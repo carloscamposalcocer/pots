@@ -11,7 +11,18 @@ from .metrics import INNER, OUTER, face_window, sample_face
 log = logging.getLogger(__name__)
 
 PREVIEW_FACES = 120_000
+MAX_EDGE = 5.0        # mm; longer triangle edges are split before drawing (see drawable)
 LIGHT = np.array([0.4, -0.6, 0.7]) / np.linalg.norm([0.4, -0.6, 0.7])
+
+
+def drawable(mesh, faces):
+    """The mesh for drawing: decimated to `faces`, then with every edge longer
+    than MAX_EDGE split. matplotlib has no depth buffer, it draws triangles
+    in the order of their centres' depth, and the long thin triangles of an
+    exact (solid.py) mesh then show through as streaks."""
+    m = decimate(mesh, faces)
+    v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=MAX_EDGE, max_iter=10)
+    return trimesh.Trimesh(v, f, process=False)
 
 
 def draw_mesh(ax, tris, normals, pot, elev, azim, pad=4, tight=False):
@@ -34,7 +45,7 @@ def render(mesh, field, pot, path, title):
     import matplotlib.pyplot as plt
 
     t0 = time.perf_counter()
-    m = decimate(mesh, PREVIEW_FACES)          # light mesh for drawing
+    m = drawable(mesh, PREVIEW_FACES)          # light mesh for drawing
 
     def draw(ax, tris, normals, elev, azim):
         draw_mesh(ax, tris, normals, pot, elev, azim)
@@ -74,7 +85,7 @@ def render_card(mesh, field, pot, path, title):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    m = decimate(mesh, 2 * PREVIEW_FACES)
+    m = drawable(mesh, 2 * PREVIEW_FACES)
     fig = plt.figure(figsize=(8, 4.2))
     draw_mesh(fig.add_subplot(1, 2, 1, projection="3d"), m.triangles, m.face_normals, pot, 14, -60, pad=2, tight=True)
     win = face_window(pot, width=40.0, height=30.0)
@@ -122,7 +133,7 @@ def render_shapes(pot, path, meshes=None):
     for col, name in enumerate(names):
         p = dataclasses.replace(pot, shape=name)
         if meshes:
-            m = decimate(meshes[name], PREVIEW_FACES)
+            m = drawable(meshes[name], PREVIEW_FACES)
             ax3 = fig.add_subplot(rows, len(names), col + 1, projection="3d")
             draw_mesh(ax3, m.triangles, m.face_normals, p, 14, -60, pad=2, tight=True)
             ax3.set_title(name, fontsize=12, color=INK)

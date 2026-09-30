@@ -84,17 +84,21 @@ def _segments(r):
     return int(np.ceil(np.pi / np.arccos(1 - TOL / r)))
 
 
-def _revolve(section, r):
-    """Revolve `section` with a chord error below TOL at radius r. Turned by
-    an irrational part of a segment: the pattern repeats a whole number of
-    times around, and a facet edge lined up exactly with hole corners makes
-    faces that touch (edges shared by 4 faces once the vertices are merged)."""
+TURNS = ((np.sqrt(5) - 1) / 2, np.sqrt(2) - 1, np.pi - 3)   # see _revolve
+
+
+def _revolve(section, r, turn=TURNS[0]):
+    """Revolve `section` with a chord error below TOL at radius r, turned by
+    `turn` (an irrational part) of a segment: the pattern repeats a whole
+    number of times around, and a facet edge lined up (nearly) exactly with
+    a hole edge makes faces that touch (edges shared by 4 faces once the
+    vertices are merged). build_solid tries the next turn if that happens."""
     from manifold3d import Manifold
     n = _segments(r)
-    return Manifold.revolve(section, n).rotate([0, 0, 360 / n * (np.sqrt(5) - 1) / 2])
+    return Manifold.revolve(section, n).rotate([0, 0, 360 / n * turn])
 
 
-def _clip(pot):
+def _clip(pot, turn=TURNS[0]):
     """Where holes may be cut: the pattern band, minus the soil-side skin."""
     from manifold3d import CrossSection
     lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
@@ -104,7 +108,7 @@ def _clip(pot):
         z = np.linspace(max(pot.skin_z, lo), hi, 200)
         skin = np.concatenate([[(0, z[0])], np.c_[pot.r_in(z) + pot.skin, z], [(0, z[-1])]])
         band = band - CrossSection([_ccw(skin)])
-    return _revolve(band.simplify(TOL / 2), R)
+    return _revolve(band.simplify(TOL / 2), R, turn)
 
 
 def _split(pot, outlines):
@@ -189,10 +193,10 @@ def build_solid(pot, outlines):
     doc), as a trimesh."""
     from manifold3d import Manifold, Mesh, OpType
     t0 = time.perf_counter()
-    body = _revolve(_profile(pot), pot.r_max)
     s = depths(pot)
     groups = _groups(outlines)
     n = sum(len(g) for g in groups)
+    holes = None
     if groups:
         lofts = [_lofts(pot, g, s) for g in groups]
         if _disjoint(pot, groups):
@@ -211,9 +215,18 @@ def build_solid(pot, outlines):
             holes = Manifold.batch_boolean(parts, OpType.Add)
         if holes.status().name != "NoError":
             raise RuntimeError(f"hole cutters are not a valid solid: {holes.status()}")
-        body = body - (holes ^ _clip(pot))
     log.info("%d holes", n)
-    m = body.to_mesh()
-    mesh = trimesh.Trimesh(m.vert_properties[:, :3], m.tri_verts, process=True)
+    profile = _profile(pot)
+    for turn in TURNS:
+        body = _revolve(profile, pot.r_max, turn)
+        if holes is not None:
+            body = body - (holes ^ _clip(pot, turn))
+        m = body.to_mesh()
+        mesh = trimesh.Trimesh(m.vert_properties[:, :3], m.tri_verts, process=True)
+        if mesh.is_watertight:
+            break
+        log.debug("facets lined up with a hole edge (pinched edges); turning the revolve")
+    else:
+        log.warning("solid mesh is not watertight after %d tries", len(TURNS))
     log.info("solid mesh: %s faces in %.1f s", f"{len(mesh.faces):,}", time.perf_counter() - t0)
     return mesh

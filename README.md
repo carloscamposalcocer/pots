@@ -202,7 +202,7 @@ pots-gallery hex slots                # only these
 pots-gallery quality=draft            # faster, coarser
 pots-gallery size=big --images pics   # the 100 mm pot, images in pics/
 pots-gallery height=90 design.wall=5  # any shape setting of `pots`
-pots-gallery --shapes size=big        # only docs/shapes.png: every pot shape (~9 min)
+pots-gallery --shapes size=big        # only docs/shapes.png: every pot shape (~1 min)
 ```
 
 It takes the shape settings of `pots` (`size`, `height`, `design.*`,
@@ -264,25 +264,33 @@ reduced to its largest body and repaired. That works for any shape, but a
 grid can't follow a sharp edge that runs across it: flat ribs come out
 with sawtooth edges, and it takes many triangles.
 
-Patterns whose holes are polygons can also give their hole outlines
-directly (`Pattern.cutters`; the tapered ones: `voronoi`, `hex`, `drops`, `lattice`, `isogrid`). Then `solid.py` builds the
-pot exactly with [manifold3d](https://github.com/elalish/manifold): the
-plain pot is revolved from its profile, each hole is a loft from its
-soil-side outline to its outside one, and all holes are subtracted at
-once. Faces are flat and edges sharp, and it is watertight by
-construction. For the 100 mm lattice pot:
+The tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`)
+can also give their hole outlines directly (`Pattern.cutters`). Then
+`solid.py` builds the pot exactly with
+[manifold3d](https://github.com/elalish/manifold): the plain pot is
+revolved from its profile, each hole is a loft from its soil-side outline
+to its outside one, and all holes are subtracted at once. Faces are flat,
+edges sharp, curved hole sides (voronoi's cell edges are hyperbola arcs)
+smooth, and it is watertight by construction. On the 100 mm pot
+(`size=big`), against marching cubes at `quality=full` (~45 s, 900 000
+faces, 45 MB STL for every pattern):
 
-| | marching cubes (`quality=full`) | exact |
-|---|---|---|
-| build | ~50 s | ~1.5 s |
-| faces | 900 000 | ~100 000 |
-| STL | 45 MB | 5 MB |
+| pattern | exact build | faces | STL | whole `pots` run (no preview) |
+|---|---|---|---|---|
+| `voronoi` | 3.9 s | 292 000 | 14 MB | 14 s |
+| `hex` | 3.5 s | 253 000 | 13 MB | 10 s |
+| `drops` | 3.1 s | 200 000 | 10 MB | 8 s |
+| `lattice` | 1.6 s | 99 000 | 5 MB | 6 s |
+| `isogrid` | 2.4 s | 179 000 | 9 MB | 7 s |
 
-The exact mesh follows the field to within ~0.03 mm (the hole volume
-matches within 0.6%, tested). Two small differences: the field's 1 mm
-rounded blends where the wall meets the base and cup become 0.8 mm 45°
-chamfers, and if the settings close the holes up inside the wall (a strut
-wider than the cell), the build falls back to marching cubes.
+The exact mesh follows the field to within ~0.03 mm: the hole volume
+matches the field's within 1% on every shape and size (tested; most are
+within 0.5%). Small differences: the field's 1 mm rounded blends where the
+wall meets the base and cup become 0.8 mm 45° chamfers; a lattice whose
+holes close up inside the wall (a strut wider than the cell) falls back to
+marching cubes; and the overhang share reads a little higher (hex 14.8%
+vs 12.9%) because the sloped hole roofs stay sharp instead of being
+rounded off.
 
 Either way, each build logs whether the mesh is watertight and a single
 body, plus the wall metrics (which always come from the field).
@@ -295,6 +303,6 @@ The `key=value` syntax is the same; `--show` replaces `--cfg job`.
 
 ```sh
 uv sync            # installs the dev group (pytest) too
-uv run pytest      # ~35 s, includes small draft and exact builds
-uv run pytest -m slow   # ~1 min: builds every pattern and every shape, checks for loose parts and overhangs
+uv run pytest      # ~50 s, includes small draft and exact builds
+uv run pytest -m slow   # ~3 min: builds every pattern and every shape, checks for loose parts and overhangs
 ```
