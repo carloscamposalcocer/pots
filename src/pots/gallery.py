@@ -85,7 +85,7 @@ def main(argv=None):
     log.info("pot H %g mm, wall %g mm, voxel %g mm -> %s", pot.height, pot.wall, cfg.quality.voxel, images)
     for name in names or list(PATTERNS):
         t = time.perf_counter()
-        m, field = generate(pot, name, cfg.quality.voxel, cfg.quality.faces, cfg.patterns)
+        m, field = generate(pot, name, cfg.quality.voxel, cfg.quality.faces, cfg.patterns, cfg.mesher)
         if not m.is_watertight or m.body_count != 1:
             log.warning("%s: mesh is not a single watertight body", name)
         render_card(m, field, pot, images / f"{name}.png", f"{name}  (H {pot.height:g} mm)")
@@ -104,7 +104,7 @@ def build_shapes(pot, cfg, path):
     for name in SHAPES:
         t = time.perf_counter()
         m, _ = generate(dataclasses.replace(pot, shape=name), cfg.pattern, cfg.quality.voxel,
-                        cfg.quality.faces, cfg.patterns)
+                        cfg.quality.faces, cfg.patterns, cfg.mesher)
         if not m.is_watertight or m.body_count != 1:
             log.warning("%s: mesh is not a single watertight body", name)
         meshes[name] = m

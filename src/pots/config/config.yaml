@@ -3,9 +3,9 @@
 #
 # Every value here is a default: override any of them on the command
 # line with key=value, no need to edit this file.
-#   pots size=big                  # the 130 mm reference pot
+#   pots size=big                  # the 100 mm pot
 #   pots quality=full              # print-quality mesh (default: draft)
-#   pots size=big height=100       # start from a preset, change one value
+#   pots size=big height=120       # start from a preset, change one value
 #   pots --show                    # print the final settings, no build
 # See README.md for the full description of each parameter.
 # =====================================================================
@@ -16,7 +16,7 @@ defaults:
   # Mesh quality preset: `draft` (default, fast check, too coarse to
   # print) or `full` (the file you print). Files in config/quality/.
   - quality: draft
-  # Pot size preset: `big` (130 mm) or `small` (50 mm), files in
+  # Pot size preset: `big` (100 mm) or `small` (50 mm), files in
   # config/size/. Sets `height` and `design.wall`.
   - size: small
   # Settings of every wall pattern (cell size, struts, ...), one block per
@@ -59,6 +59,13 @@ pattern: voronoi
 shape: tapered
 
 # height (mm) comes from the size preset (config/size/); see there.
+
+# mesher: how the mesh is made.
+#   auto  exact geometry (flat faces, sharp edges, few triangles, a few
+#         seconds) for the patterns that support it (lattice), marching
+#         cubes at quality.voxel / quality.faces for the others.
+#   sdf   marching cubes for every pattern (the old way, for comparison).
+mesher: auto
 
 # preview: also render a PNG (outside view, cut-away, vertical section,
 # and both wall faces at true scale with their open %). Costs ~10 s.

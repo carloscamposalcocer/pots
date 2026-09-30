@@ -6,7 +6,8 @@ plain cup fused to the base catches drips and holds a small water reserve
 that the soil wicks back up.
 
 The pot is generated from code (an implicit field meshed with marching
-cubes) and exported as STL + 3MF, with a PNG preview.
+cubes, or exact geometry for the patterns that support it) and exported
+as STL + 3MF, with a PNG preview.
 
 ## Setup
 
@@ -62,6 +63,7 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 | `preview` | `true` | Also render the PNG preview (~10 s). |
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `draft` | Mesh quality preset: `draft` (fast check) or `full` (for printing). |
+| `mesher` | `auto` | `auto`: exact geometry for the patterns that support it (`lattice` so far), marching cubes for the others. `sdf`: marching cubes for every pattern. See [How the mesh is made](#how-the-mesh-is-made). |
 
 ### Size presets (`src/pots/config/size/`)
 
@@ -83,7 +85,9 @@ command line still wins, so `size=big height=110` is a big pot made
 
 The default is `draft`, which is too coarse to print: build the final file
 with `quality=full`. You can also override a single value:
-`quality=full quality.voxel=0.4`.
+`quality=full quality.voxel=0.4`. The quality settings only apply to
+marching cubes: an exactly built pattern (`lattice`) is the same, print
+ready mesh at any quality.
 
 ### Design sizes (`design.*`, mm)
 
@@ -242,7 +246,8 @@ src/pots/
   field.py      make_field(): wall + rim + base + cup as one implicit field
   sdf.py        field helper (smin)
   mesh.py       slab-wise marching cubes, decimation and repair
-  pipeline.py   generate(): field -> clean, watertight mesh
+  solid.py      exact mesh: revolved pot minus lofted hole cutters (manifold3d)
+  pipeline.py   generate(): exact or marching-cubes mesh, plus the field
   metrics.py    open %, hole size and straight-through % of both wall faces
   preview.py    PNG preview and the small gallery image
 tests/          pytest suite (uv run pytest)
@@ -250,10 +255,36 @@ docs/patterns/  gallery images used in this README (pots-gallery)
 docs/shapes.png pot shape sheet (pots-gallery --shapes size=big)
 ```
 
-The model is an implicit field (negative = solid), meshed with marching
-cubes in z-slabs, then decimated, reduced to its largest body and repaired.
-Each build logs whether the mesh is watertight and a single body, plus the
-wall metrics.
+### How the mesh is made
+
+Every pattern is defined as an implicit field (negative = solid). By
+default it is meshed with marching cubes in z-slabs, then decimated,
+reduced to its largest body and repaired. That works for any shape, but a
+grid can't follow a sharp edge that runs across it: flat ribs come out
+with sawtooth edges, and it takes many triangles.
+
+Patterns whose holes are polygons can also give their hole outlines
+directly (`Pattern.cutters`; `lattice` so far). Then `solid.py` builds the
+pot exactly with [manifold3d](https://github.com/elalish/manifold): the
+plain pot is revolved from its profile, each hole is a loft from its
+soil-side outline to its outside one, and all holes are subtracted at
+once. Faces are flat and edges sharp, and it is watertight by
+construction. For the 100 mm lattice pot:
+
+| | marching cubes (`quality=full`) | exact |
+|---|---|---|
+| build | ~50 s | ~1.5 s |
+| faces | 900 000 | ~100 000 |
+| STL | 45 MB | 5 MB |
+
+The exact mesh follows the field to within ~0.03 mm (the hole volume
+matches within 0.6%, tested). Two small differences: the field's 1 mm
+rounded blends where the wall meets the base and cup become 0.8 mm 45°
+chamfers, and if the settings close the holes up inside the wall (a strut
+wider than the cell), the build falls back to marching cubes.
+
+Either way, each build logs whether the mesh is watertight and a single
+body, plus the wall metrics (which always come from the field).
 
 Hydra note: the config is loaded with Hydra's compose API rather than
 `@hydra.main`, because hydra-core 1.3's own CLI crashes on Python 3.14.
@@ -263,6 +294,6 @@ The `key=value` syntax is the same; `--show` replaces `--cfg job`.
 
 ```sh
 uv sync            # installs the dev group (pytest) too
-uv run pytest      # ~20 s, includes a small draft build
-uv run pytest -m slow   # ~25 s: builds every pattern, checks for loose parts and overhangs
+uv run pytest      # ~35 s, includes small draft and exact builds
+uv run pytest -m slow   # ~1 min: builds every pattern and every shape, checks for loose parts and overhangs
 ```

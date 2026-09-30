@@ -64,6 +64,9 @@ def pot_from_config(cfg):
     """Validated Pot for a config; raises ValueError with a user-facing message."""
     if cfg.pattern not in PATTERNS:
         raise ValueError(f"unknown pattern '{cfg.pattern}'; choose from: {', '.join(sorted(PATTERNS))}")
+    from .pipeline import MESHERS
+    if cfg.mesher not in MESHERS:
+        raise ValueError(f"unknown mesher '{cfg.mesher}'; choose from: {', '.join(MESHERS)}")
     pot = Pot(height=float(cfg.height), shape=str(cfg.shape), **{k: float(v) for k, v in cfg.design.items()})
     check_pattern_params(cfg)
     return pot
@@ -124,7 +127,7 @@ def run(cfg):
     base = out / f"pot_{cfg.pattern}"
     t = time.perf_counter()
     log.info("[1/3] building")
-    m, field = generate(pot, cfg.pattern, q.voxel, q.faces, cfg.patterns)
+    m, field = generate(pot, cfg.pattern, q.voxel, q.faces, cfg.patterns, cfg.mesher)
     size = np.ptp(m.bounds, axis=0)
     log.info("mesh  faces=%s  watertight=%s  bodies=%d  size=%.1f x %.1f x %.1f mm  volume=%.0f cm3",
              f"{len(m.faces):,}", m.is_watertight, m.body_count, *size, m.volume / 1000)

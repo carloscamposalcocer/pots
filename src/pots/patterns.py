@@ -37,6 +37,7 @@ class Pattern(NamedTuple):
     fn: Callable
     description: str
     uses: tuple = ()              # other patterns whose settings it also reads
+    cutters: Callable = None      # exact hole outlines for solid.py, (pot, c, depths) -> (outlines, disjoint)
 
 
 def load_params(params=None):
@@ -204,6 +205,44 @@ def pat_lattice(pot, P, th, Z, r, s):
     return strut / 2 - lattice_dist(pot, c, th, Z, taper_shift(c, s, np.cos(SLOPE)))
 
 
+def lattice_cutters(pot, c, depths):
+    """The lattice holes for solid.py: (outlines, disjoint), outlines being
+    (n, len(depths), 4, 2) diamonds in the unrolled (S, Z) plane at each of
+    `depths`. Each hole is the diamond between strips k, k+1 of one set
+    (u = S + Z cot) and m, m+1 of the other (v = S - Z cot), minus half a
+    strut on every side, moved down like lattice_dist. None if the holes
+    close up somewhere (a loft can't do that; the field can)."""
+    n = pot.count(c.cells)
+    p = pot.circ / n
+    cot = 1 / np.tan(SLOPE)
+    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
+    shift = np.array([taper_shift(c, s, np.cos(SLOPE)) for s in depths])
+    w = np.array([taper(c, s) for s in depths]) / (2 * np.sin(SLOPE))   # half strut along u
+    if (p / 2 - w < 0.01).any():
+        return None
+    # every (k, m) whose hole centre falls in one turn and near the pattern band
+    m_ = abs(shift).max() + p / cot
+    half = pot.circ / 2
+    k = np.arange(np.floor((-half + (lo - m_) * cot) / p) - 1, np.ceil((half + (hi + m_) * cot) / p) + 1)
+    m = np.arange(np.floor((-half - (hi + m_) * cot) / p) - 1, np.ceil((half - (lo - m_) * cot) / p) + 1)
+    K, M = [a.ravel() for a in np.meshgrid(k, m)]
+    uc, vc = (K + 0.5) * p, (M + 0.5) * p
+    Zc = (uc - vc) / (2 * cot)
+    # the centre is at S = (K + M + 1) p / 2: one turn is K + M + 1 in [-n, n)
+    # (integers, so a hole on the seam isn't taken twice)
+    j = K + M + 1
+    keep = (j >= -n) & (j < n) & (Zc > lo - m_) & (Zc < hi + m_)
+    uc, vc = uc[keep], vc[keep]
+    out = np.empty((len(uc), len(depths), 4, 2))
+    for i in range(len(depths)):
+        a = p / 2 - w[i]                          # half the hole along u and v
+        for j, (du, dv) in enumerate(((a, -a), (a, a), (-a, a), (-a, -a))):   # top, right, bottom, left
+            u, v = uc + du, vc + dv
+            out[:, i, j, 0] = (u + v) / 2
+            out[:, i, j, 1] = (u - v) / (2 * cot) - shift[i]
+    return out, bool((w > 0).all())
+
+
 def pat_louvers(pot, P, th, Z, r, s):
     """Gills: brick-staggered slits that run down and outward through the wall
     like shutter blades. The drop is more than the slit height, so there is
@@ -332,7 +371,8 @@ PATTERNS = {
     "voronoi": Pattern("2d", pat_voronoi, "organic cells flaring outward like funnels (default)"),
     "hex": Pattern("2d", pat_hex, "warped honeycomb, pointy-top cells, flaring outward"),
     "drops": Pattern("2d", pat_drops, "staggered teardrops flaring outward"),
-    "lattice": Pattern("2d", pat_lattice, "diamond trellis of crossing helical strips, flaring outward"),
+    "lattice": Pattern("2d", pat_lattice, "diamond trellis of crossing helical strips, flaring outward",
+                       cutters=lattice_cutters),
     "isogrid": Pattern("2d", pat_isogrid, "triangle grid, flaring outward"),
     "louvers": Pattern("2d", pat_louvers, "gills sloping down and out, no line of sight"),
     "slots": Pattern("2d", pat_slots, "narrow wavy vertical slots, air-pruning style"),

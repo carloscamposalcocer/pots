@@ -25,6 +25,8 @@ def test_bad_values():
         pot_from_config(load_config(["height=5"]))
     with pytest.raises(ValueError, match="unknown shape"):
         pot_from_config(load_config(["shape=nope"]))
+    with pytest.raises(ValueError, match="unknown mesher"):
+        pot_from_config(load_config(["mesher=nope"]))
 
 
 def test_shape_setting():
