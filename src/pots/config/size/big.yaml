@@ -1,5 +1,5 @@
 # @package _global_
-# Big pot: the 130 mm reference shape, 151 mm wide. Select with size=big.
+# Big pot: 100 mm tall, ~118 mm wide with the cup. Select with size=big.
 # Any value here can still be overridden, e.g. size=big height=110.
 
 # height (mm): overall pot height. Drives the whole shape: the radii,

@@ -26,8 +26,8 @@ and have defaults. Override only what you want to change, as `key=value`:
 ```sh
 pots                                  # quick draft build with the defaults (size=small)
 pots quality=full                     # print-quality mesh, use this for the file you print
-pots size=big                         # the 130 mm reference pot
-pots size=big height=100              # start from a preset, change one value
+pots size=big                         # the 100 mm pot
+pots size=big height=120              # start from a preset, change one value
 pots pattern=hex design.wall=4        # another pattern, thinner wall
 pots height=65 --show                 # print the final settings, don't build
 pots --all                            # every pattern, one after another
@@ -71,14 +71,14 @@ command line still wins, so `size=big height=110` is a big pot made
 
 | Key | `big` | `small` |
 |---|---|---|
-| `height` | 130 (151 mm wide) | 50 (~62 mm wide with the cup) |
+| `height` | 100 (~118 mm wide with the cup) | 50 (~62 mm wide with the cup) |
 | `design.wall` | 6.0 | 4.0 |
 
 ### Quality presets (`src/pots/config/quality/`)
 
 | Key | `full` | `draft` | Description |
 |---|---|---|---|
-| `quality.voxel` | 0.3 | 0.6 | Mesh grid spacing in mm. Time and memory grow ~1/voxel³: full at 130 mm takes ~2–3 min and 2–3 GB RAM, draft ~1 min. Don't run several full builds in parallel. |
+| `quality.voxel` | 0.3 | 0.6 | Mesh grid spacing in mm. Time and memory grow ~1/voxel³: on the 100 mm pot (`size=big`) full takes ~45 s, draft ~10 s; a full 130 mm pot needs 2–3 GB RAM. Don't run several full builds in parallel. |
 | `quality.faces` | 900 000 | 100 000 | Triangle budget; the mesh is decimated to this. |
 
 The default is `draft`, which is too coarse to print: build the final file
@@ -195,7 +195,7 @@ config; use `pots pattern=<name>` for a printable pot).
 pots-gallery                          # every pattern (a few minutes in total)
 pots-gallery hex slots                # only these
 pots-gallery quality=draft            # faster, coarser
-pots-gallery size=big --images pics   # the 130 mm pot, images in pics/
+pots-gallery size=big --images pics   # the 100 mm pot, images in pics/
 pots-gallery height=90 design.wall=5  # any shape setting of `pots`
 pots-gallery --shapes size=big        # only docs/shapes.png: every pot shape (~9 min)
 ```
@@ -240,7 +240,7 @@ src/pots/
   geometry.py   Pot: all dimensions, scaled from the height
   patterns.py   wall patterns (PATTERNS registry)
   field.py      make_field(): wall + rim + base + cup as one implicit field
-  sdf.py        field helpers (smin, cylindrical)
+  sdf.py        field helper (smin)
   mesh.py       slab-wise marching cubes, decimation and repair
   pipeline.py   generate(): field -> clean, watertight mesh
   metrics.py    open %, hole size and straight-through % of both wall faces
@@ -263,6 +263,6 @@ The `key=value` syntax is the same; `--show` replaces `--cfg job`.
 
 ```sh
 uv sync            # installs the dev group (pytest) too
-uv run pytest      # ~30 s, includes a small draft build
-uv run pytest -m slow   # ~2 min: builds every pattern, checks for loose parts and overhangs
+uv run pytest      # ~20 s, includes a small draft build
+uv run pytest -m slow   # ~25 s: builds every pattern, checks for loose parts and overhangs
 ```

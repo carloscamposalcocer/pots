@@ -2,7 +2,8 @@
 
 # voxel (mm): grid spacing of the marching-cubes mesh. Smaller = finer
 # detail, but time and memory grow ~1/voxel^3. At 0.3 mm a 130 mm pot
-# takes ~2-3 min and 2-3 GB RAM (a 65 mm pot about 1/8 of that).
+# needs 2-3 GB RAM (a 65 mm pot about 1/8 of that); the 100 mm pot
+# takes ~45 s.
 # Don't run several full builds in parallel.
 voxel: 0.3
 

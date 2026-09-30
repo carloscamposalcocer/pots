@@ -7,8 +7,3 @@ def smin(a, b, k):
     h = np.clip(0.5 + 0.5 * (b - a) / k, 0, 1)
     return b * (1 - h) + a * h - k * h * (1 - h)
 
-
-def cylindrical(X, Y):
-    """(r, theta) of cartesian points."""
-    return np.sqrt(X * X + Y * Y), np.arctan2(Y, X)
-

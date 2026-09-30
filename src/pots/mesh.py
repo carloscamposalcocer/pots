@@ -9,6 +9,7 @@ log = logging.getLogger(__name__)
 
 SLAB = 24             # z layers per marching-cubes slab (bounds peak memory)
 DETACHED = 0.01       # warn when clean() drops more than this share of the faces
+NUDGE = 0.02          # field values closer to zero than this (in voxels) are moved off it
 
 
 def build(field, rmax, zmax, vox):
@@ -31,10 +32,11 @@ def build(field, rmax, zmax, vox):
         zz = zs[k0:k1 + 1]
         slab += 1
         log.debug("slab %d/%d  z=%.1f-%.1f mm", slab, n_slabs, float(zz[0]), float(zz[-1]))
-        X = np.repeat(X2[:, :, None], len(zz), 2)
-        Y = np.repeat(Y2[:, :, None], len(zz), 2)
-        Z = np.broadcast_to(zz, X.shape).astype(np.float32)
-        F = field(X, Y, Z).astype(np.float32)
+        F = field(X2[:, :, None], Y2[:, :, None], zz).astype(np.float32)
+        # a value at (almost) zero puts several vertices on one grid node,
+        # merge_vertices fuses them and the surface pinches (edges shared
+        # by 4 faces); push those values off zero (moves the surface < NUDGE vox)
+        F[np.abs(F) < NUDGE * vox] = NUDGE * vox
         if F.min() < 0 < F.max():
             v, f, _, _ = marching_cubes(F, 0.0)
             v[:, 2] += k0                     # stay in index space -> exact seams
@@ -52,7 +54,6 @@ def build(field, rmax, zmax, vox):
     m.vertices = m.vertices * vox + np.array([xs[0], xs[0], zs[0]])
     m.update_faces(m.nondegenerate_faces())
     m.remove_unreferenced_vertices()
-    trimesh.repair.fix_normals(m)
     log.info("meshed %s faces in %.1f s", f"{len(m.faces):,}", time.perf_counter() - t0)
     return m
 
@@ -86,10 +87,13 @@ def clean(mesh, target_faces):
     if dropped > DETACHED:
         log.warning("dropped %d detached pieces (%.0f%% of the faces): the wall pattern "
                     "has loose parts, so the printed wall will have gaps", len(parts) - 1, 100 * dropped)
-    log.info("repairing mesh")
-    fix = pymeshfix.MeshFix(mesh.vertices, mesh.faces)
-    fix.repair(joincomp=False, remove_smallest_components=True)
-    mesh = trimesh.Trimesh(fix.points, fix.faces)
+    if mesh.is_watertight and mesh.is_winding_consistent:
+        log.info("mesh is closed, skipping repair")
+    else:
+        log.info("repairing mesh")
+        fix = pymeshfix.MeshFix(mesh.vertices, mesh.faces)
+        fix.repair(joincomp=False, remove_smallest_components=True)
+        mesh = trimesh.Trimesh(fix.points, fix.faces)
     trimesh.repair.fix_normals(mesh)
     mesh.apply_translation([0, 0, -mesh.bounds[0, 2]])
     log.info("cleaned in %.1f s", time.perf_counter() - t0)

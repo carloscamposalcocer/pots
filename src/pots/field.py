@@ -6,9 +6,15 @@ import numpy as np
 
 from .geometry import CHAMFER, PATTERN_GAP
 from .patterns import PATTERNS, load_params
-from .sdf import cylindrical, smin
+from .sdf import smin
 
 BLEND = 1.5           # blend between a 3D pattern (weave) and the solid rim/base band
+# The pattern is only evaluated where the plain shell is below this (mm):
+# inside the wall or near it. Farther out the wall is at least NEAR outside
+# either way, so its exact value changes neither the sign nor, through the
+# 1 mm blends with the base and cup, any value near zero. Most of the
+# grid is air or soil space, so this skips most of the pattern work.
+NEAR = 2.5
 
 
 def make_field(pot, pattern, params=None):
@@ -18,10 +24,8 @@ def make_field(pot, pattern, params=None):
     kind, fn = PATTERNS[pattern].kind, PATTERNS[pattern].fn
     P = load_params(params)
 
-    def field(X, Y, Z):
-        r, th = cylindrical(X, Y)
-        ro, ri = pot.r_out(Z), pot.r_in(Z)
-        shell = np.maximum.reduce([r - ro, ri - r, -Z, Z - pot.height])
+    def patterned(shell, r, th, Z, ri):
+        """The wall with its pattern, at points given as flat arrays."""
         s = np.clip((r - ri) / pot.wall, 0, 1)
         band_lo = Z - (pot.base + PATTERN_GAP)    # pattern starts just above the base
         band_hi = (pot.height - pot.rim) - Z
@@ -36,7 +40,25 @@ def make_field(pot, pattern, params=None):
             # soil-side skin keeps water from running out through the wall
             skin = np.minimum(ri + pot.skin - r, Z - pot.skin_z)   # >0 inside the skin
             mat = np.minimum(mat, -skin)
-        wall = np.maximum(shell, mat)
+        return np.maximum(shell, mat)
+
+    def field(X, Y, Z):
+        X, Y, Z = np.broadcast_arrays(X, Y, Z)
+        r = np.hypot(X, Y)
+        ro, ri = pot.r_out(Z), pot.r_in(Z)
+        shell = np.maximum.reduce([r - ro, ri - r, -Z, Z - pot.height])
+        body = shell.copy()
+        near = shell < NEAR
+        th = np.arctan2(Y[near], X[near])
+        body[near] = patterned(shell[near], r[near], th, Z[near], ri[near])
+        # the base, cup and chamfer are all below cup_h; higher up they are
+        # more than NEAR away and change no value near zero (see NEAR)
+        low = Z < pot.cup_h + NEAR
+        body[low] = bottom(body[low], r[low], Z[low])
+        return body
+
+    def bottom(wall, r, Z):
+        """Fuse the base and cup to the wall, at points given as flat arrays."""
         ci = pot.cup_ri(Z)
         co = ci + pot.cup_wall
         cup_wall = np.maximum.reduce([r - co, ci - r, -Z, Z - pot.cup_h])
