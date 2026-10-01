@@ -129,7 +129,7 @@ With the defaults, on the 100 mm pot (6 mm wall):
 | pattern | outside face | soil side |
 |---|---|---|
 | `voronoi` | 78% open, holes ~4.2 mm | 29% open, holes ~2.5 mm |
-| `hex` | 52%, ~3.2 mm | 25%, ~2.2 mm |
+| `hex` | 67%, ~4.7 mm | 42%, ~3.8 mm |
 | `drops` | 56%, ~4.4 mm | 34%, ~3.4 mm |
 | `lattice` | 85%, ~4.1 mm | 13%, ~1.6 mm |
 | `isogrid` | 85%, ~3.8 mm | 24%, ~2.1 mm |
@@ -188,7 +188,7 @@ from outside, next to a 40 x 30 mm true-scale swatch of the outer wall face
 
 | | |
 |---|---|
-| **`voronoi`** (default), 2D, tapered: organic cells that flare outward like funnels. <br> ![voronoi](docs/patterns/voronoi.png) | **`hex`**, 2D, tapered: warped honeycomb, pointy-top cells, flaring outward like `voronoi`. <br> ![hex](docs/patterns/hex.png) |
+| **`voronoi`** (default), 2D, tapered: organic cells that flare outward like funnels. <br> ![voronoi](docs/patterns/voronoi.png) | **`hex`**, 2D, tapered: regular honeycomb, pointy-top cells about 6 mm across, flaring outward like `voronoi` (`warp` / `warp_z` make it wavy). <br> ![hex](docs/patterns/hex.png) |
 | **`drops`**, 2D, tapered: staggered teardrops with 55° pointed tops, flaring outward. <br> ![drops](docs/patterns/drops.png) | **`lattice`**, 2D, tapered: diamond trellis of helical strips crossing at ±55°, no bridges at all, flaring outward like `voronoi`. <br> ![lattice](docs/patterns/lattice.png) |
 | **`isogrid`**, 2D, tapered: triangle grid flaring outward like `voronoi`; the downward triangles have short flat bridges. <br> ![isogrid](docs/patterns/isogrid.png) | **`louvers`**, 2D: gills that run down and outward through the wall like shutter blades. No line of sight: soil stays in, rain runs off. <br> ![louvers](docs/patterns/louvers.png) |
 | **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) | **`spiral`**, 2D: slots on a many-start 60° helix. <br> ![spiral](docs/patterns/spiral.png) |
@@ -302,8 +302,8 @@ matches the field's within 1% on every shape and size (tested; most are
 within 0.5%). Small differences: the field's 1 mm rounded blends where the
 wall meets the base and cup become 0.8 mm 45° chamfers; a lattice whose
 holes close up inside the wall (a strut wider than the cell) falls back to
-marching cubes; and the overhang share reads a little higher (hex 14.8%
-vs 12.9%) because the sloped hole roofs stay sharp instead of being
+marching cubes; and the overhang share reads a little higher (hex 14.9%
+vs 13.4%) because the sloped hole roofs stay sharp instead of being
 rounded off.
 
 Either way, each build logs whether the mesh is watertight and a single
