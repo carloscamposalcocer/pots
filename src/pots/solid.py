@@ -142,7 +142,16 @@ def _lofts(pot, outlines, s):
     r = pot.r_in(Z) + s[None, :, None] * pot.wall
     th = S / pot.r0
     ring = np.stack([r * np.cos(th), r * np.sin(th), Z], -1)             # (n, L, m, 3)
-    caps = np.stack([ring[:, 0].mean(1), ring[:, -1].mean(1)], 1)       # (n, 2, 3)
+    # the outer cap is a fan from its centre: flat across a wide hole it would
+    # sag into the curved outer face (a chord D long sags D^2 / 8r, more than
+    # PAST for a 10 mm hole on a small pot) and leave slivers of wall in the
+    # hole, so its centre is pushed out by that much
+    top = ring[:, -1]
+    mid = top.mean(1)
+    D = 2 * np.linalg.norm(top - mid[:, None], axis=-1).max(1)
+    rr = np.hypot(top[..., 0], top[..., 1]).mean(1)
+    mid[:, :2] *= ((rr + D ** 2 / (8 * rr)) / np.hypot(mid[:, 0], mid[:, 1]))[:, None]
+    caps = np.stack([ring[:, 0].mean(1), mid], 1)                       # (n, 2, 3)
     per = L * m + 2
     verts = np.concatenate([ring.reshape(n, L * m, 3), caps], 1).reshape(-1, 3)
     j, i = np.meshgrid(np.arange(L - 1), np.arange(m), indexing="ij")

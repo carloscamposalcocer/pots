@@ -94,3 +94,34 @@ def test_center_is_checked(caplog):
     with caplog.at_level(logging.WARNING, logger="pots"):
         pot_from_config(load_config(["patterns.voronoi.center=1"]))
     assert "may sag" in caplog.text
+
+
+def test_root_slots_never_touch():
+    """Branches that don't join at a fork keep `gap` apart, so the slots can't
+    close a loop around a piece of wall."""
+    from pots.patterns import ROOT_KEYS, _root_trees, _seg_dist
+    c = load_params().roots
+    for seg, lvl in _root_trees(20.0, c.row_h, tuple((k, getattr(c, k)) for k in ROOT_KEYS)):
+        ends = [(s[:2].round(9).tobytes(), s[2:].round(9).tobytes()) for s in seg]
+        for i in range(len(seg)):
+            for j in range(i):
+                if set(ends[i]) & set(ends[j]):
+                    continue                    # they meet at a fork
+                w = c.width_out * (c.thin ** lvl[i] + c.thin ** lvl[j]) / 2
+                assert _seg_dist(seg[i, :2], seg[i, 2:], seg[j, :2], seg[j, 2:]) >= w + c.gap - 1e-9
+
+
+def test_bubble_cells_never_overlap():
+    """Holes are cells less half a strut, so non-overlapping cells keep holes a strut apart."""
+    from pots.patterns import _bubble_grids, _drop, _drop_outline
+    c = load_params().bubbles
+    pot = Pot(height=65)
+    grids = _bubble_grids(pot.circ, pot.height, c.radius, c.ratio, c.levels, c.jitter, c.spread, c.seed)
+    cen = np.concatenate([g[1][g[3]] for g in grids])
+    rad = np.concatenate([g[2][g[3]] for g in grids])
+    pts = cen[:, None] + _drop_outline()[None] * rad[:, None, None]          # (n, m, 2)
+    for i in range(len(cen)):
+        dx = np.mod(pts[..., 0] - cen[i, 0] + pot.circ / 2, pot.circ) - pot.circ / 2
+        d = _drop(dx, pts[..., 1] - cen[i, 1], rad[i])
+        d[i] = np.inf
+        assert d.min() > 0

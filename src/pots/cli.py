@@ -73,7 +73,7 @@ def pot_from_config(cfg):
 
 
 # tapered patterns whose hole roofs are flat bridges (the others have 55-degree roofs)
-BRIDGE_ROOFS = {"voronoi", "hex", "isogrid"}
+BRIDGE_ROOFS = {"voronoi", "hex", "isogrid", "veins"}
 
 
 def check_pattern_params(cfg):

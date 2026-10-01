@@ -63,7 +63,7 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 | `preview` | `true` | Also render the PNG preview (~10 s). |
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `draft` | Mesh quality preset: `draft` (fast check) or `full` (for printing). |
-| `mesher` | `auto` | `auto`: exact geometry for the patterns that support it (the tapered ones: `voronoi`, `hex`, `drops`, `lattice`, `isogrid`), marching cubes for the others. `sdf`: marching cubes for every pattern. See [How the mesh is made](#how-the-mesh-is-made). |
+| `mesher` | `auto` | `auto`: exact geometry for the patterns that support it (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`, `sierpinski`, `trellis`, `bubbles`), marching cubes for the others. `sdf`: marching cubes for every pattern. See [How the mesh is made](#how-the-mesh-is-made). |
 
 ### Size presets (`src/pots/config/size/`)
 
@@ -86,8 +86,8 @@ command line still wins, so `size=big height=110` is a big pot made
 The default is `draft`, which is too coarse to print: build the final file
 with `quality=full`. You can also override a single value:
 `quality=full quality.voxel=0.4`. The quality settings only apply to
-marching cubes (`louvers`, `slots`, `spiral`, `chevrons`, `weave`, or any
-pattern with `mesher=sdf`): an exactly built pattern is the same, print
+marching cubes (`louvers`, `slots`, `spiral`, `chevrons`, `weave`, `veins`,
+`roots`, or any pattern with `mesher=sdf`): an exactly built pattern is the same, print
 ready mesh at any quality.
 
 ### Design sizes (`design.*`, mm)
@@ -120,9 +120,10 @@ Keys most patterns share:
 | Key | Description |
 |---|---|
 | `cells` | Cells around the pot at the 130 mm reference height; scaled with `height` (see [Scaling](#scaling-with-height)). More cells = smaller holes. |
-| `strut_in` | Tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`): strut width on the soil side (2.2 mm; `lattice` 3.0). Wider = smaller inner holes = less soil loss, less air. Keep ≥ ~1.1 (0.4 mm nozzle). |
+| `strut_in` | Tapered and fractal patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`, `sierpinski`, `trellis`, `veins`, `bubbles`): strut width on the soil side (2.2 mm; `lattice` 3.0; the finest level of `trellis` 1.3 and `veins` 1.2). Wider = smaller inner holes = less soil loss, less air. Keep ≥ ~1.1 (0.4 mm nozzle). |
 | `strut_out` | Tapered patterns: strut width on the outside (`voronoi` 0.5, `lattice` and `isogrid` 0.3, `hex` and `drops` 1.1 mm). Keep ≤ `strut_in` so holes widen outward. The strut is a wedge through the wall, so its outer edge may be thinner than the nozzle: the slicer just trims the tip and the outside holes get a little bigger. |
-| `center` | Tapered patterns, 0 to 1 (1 on `voronoi`, `drops`, `lattice`, `isogrid`; 0 on `hex`). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex` and `isogrid` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice` have 55° roofs and barely change. |
+| `center` | Tapered and fractal patterns, 0 to 1 (1 on `voronoi`, `drops`, `lattice`, `isogrid`, `sierpinski`, `trellis`, `bubbles`; 0 on `hex`, `veins`). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex`, `isogrid` and `veins` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; the others have 55–60° roofs and barely change. |
+| `vein` | Fractal patterns with struts at several levels (`trellis`, `veins`): `strut_in` / `strut_out` are the finest level's, and each coarser level's struts are this much wider. |
 
 With the defaults, on the 100 mm pot (6 mm wall):
 
@@ -133,6 +134,15 @@ With the defaults, on the 100 mm pot (6 mm wall):
 | `drops` | 56%, ~4.4 mm | 34%, ~3.4 mm |
 | `lattice` | 85%, ~4.1 mm | 13%, ~1.6 mm |
 | `isogrid` | 85%, ~3.8 mm | 24%, ~2.1 mm |
+| `sierpinski` | 53%, biggest ~6 mm | 22%, biggest ~4.3 mm |
+| `trellis` | 68%, biggest ~4 mm | 23%, biggest ~2.7 mm |
+| `veins` | 51%, biggest ~4 mm | 18%, biggest ~3 mm |
+| `roots` | 19%, 3.0 mm slots | 14%, 2.2 mm slots |
+| `bubbles` | 41%, biggest ~6 mm | 18%, biggest ~4.7 mm |
+
+The fractal patterns have holes in several sizes, so their median hole
+(what `pots` logs) is small; the table gives the biggest (the width of the
+widest slot, or the diameter of the circle that fits in the biggest hole).
 
 At 2.2 / 1.1 mm struts `voronoi` is 58% (3.6 mm) outside and 29% (2.5 mm)
 inside. `pots` logs these numbers for every build. The 55° roof slope and
@@ -193,6 +203,9 @@ from outside, next to a 40 x 30 mm true-scale swatch of the outer wall face
 | **`isogrid`**, 2D, tapered: triangle grid flaring outward like `voronoi`; the downward triangles have short flat bridges. <br> ![isogrid](docs/patterns/isogrid.png) | **`louvers`**, 2D: gills that run down and outward through the wall like shutter blades. No line of sight: soil stays in, rain runs off. <br> ![louvers](docs/patterns/louvers.png) |
 | **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) | **`spiral`**, 2D: slots on a many-start 60° helix. <br> ![spiral](docs/patterns/spiral.png) |
 | **`chevrons`**, 2D: stacked arrowhead slots. <br> ![chevrons](docs/patterns/chevrons.png) | **`weave`**, 3D: two sets of strips woven over and under through the wall (the swatch shows only where they touch the outer face). <br> ![weave](docs/patterns/weave.png) |
+| **`sierpinski`**, 2D, fractal: Sierpinski gasket of upward triangles in 3 sizes; every roof is a 60° point, no bridges. The smallest open only outside. <br> ![sierpinski](docs/patterns/sierpinski.png) | **`trellis`**, 2D, fractal: the `lattice` diamonds, each split at random into four smaller ones (and again), with thinner strips at each level. No bridges. <br> ![trellis](docs/patterns/trellis.png) |
+| **`veins`**, 2D, fractal: three voronoi networks laid over each other, cells halving and struts thinning at each level, like leaf veins or dried mud. <br> ![veins](docs/patterns/veins.png) | **`roots`**, 2D, fractal: branching root-shaped slots hanging in a staggered grid, a few random trees. Branches that don't join stay `gap` apart, so no piece of wall is cut loose. <br> ![roots](docs/patterns/roots.png) |
+| **`bubbles`**, 2D, fractal: a random foam of teardrops in 3 sizes; the big ones go first and the smaller ones fill the gaps. <br> ![bubbles](docs/patterns/bubbles.png) | |
 
 2D patterns are cut radially through the wall (louvers slope down through
 it). All wrap seamlessly around the pot.

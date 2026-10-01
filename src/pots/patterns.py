@@ -26,7 +26,7 @@ from typing import Callable, NamedTuple
 
 import numpy as np
 
-from .geometry import PATTERN_GAP
+from .geometry import PATTERN_GAP, R0_REF
 
 PARAMS_FILE = Path(__file__).parent / "config" / "patterns.yaml"
 SLOPE = np.deg2rad(55)  # sloped roofs, from horizontal in the unrolled plane
@@ -499,12 +499,7 @@ def drops_cutters(pot, c, depths, arc=16):
     if (R < 0.02).any():
         return None
     shift = np.array([taper_shift(c, s, np.cos(SLOPE)) for s in depths])
-    a0 = np.pi / 2 - SLOPE                                   # tangent point, above the horizontal
-    ang = np.linspace(a0, a0 - (np.pi + 2 * a0), arc)        # clockwise, under the centre, to the other one
-    # points a little outside the circle, so the chords straddle it instead of cutting inside
-    bulge = 2 / (1 + np.cos((ang[0] - ang[1]) / 2))
-    unit = np.c_[np.cos(ang), np.sin(ang)] * bulge
-    shape = np.concatenate([[[0, 1 / np.cos(SLOPE)]], unit])    # (arc + 1, 2), for R = 1
+    shape = _teardrop(arc)
     margin = rowh + np.abs(shift).max() + p
     j = np.arange(np.floor((lo - margin) / rowh), np.ceil((hi + margin) / rowh) + 1)
     J, I = [x.ravel() for x in np.meshgrid(j, np.arange(n), indexing="ij")]
@@ -516,6 +511,19 @@ def drops_cutters(pot, c, depths, arc=16):
     out = out + np.stack([np.broadcast_to(Sc[:, None], (len(Sc), len(depths))),
                           Zc[:, None] - shift[None]], -1)[:, :, None]
     return out
+
+
+def _teardrop(arc):
+    """Outline of a teardrop of radius 1 for the cutters, (arc + 1, 2): the
+    apex 1 / cos(SLOPE) above the centre, then `arc` points around the bottom
+    of the circle from one tangent point (90 - SLOPE degrees above the
+    horizontal) to the other, pushed a little out so the chords straddle
+    the circle instead of cutting inside it."""
+    a0 = np.pi / 2 - SLOPE                                   # tangent point, above the horizontal
+    ang = np.linspace(a0, a0 - (np.pi + 2 * a0), arc)        # clockwise, under the centre, to the other one
+    bulge = 2 / (1 + np.cos((ang[0] - ang[1]) / 2))
+    unit = np.c_[np.cos(ang), np.sin(ang)] * bulge
+    return np.concatenate([[[0, 1 / np.cos(SLOPE)]], unit])
 
 
 def pat_spiral(pot, P, th, Z, r, s):
@@ -643,6 +651,456 @@ def pat_weave(pot, P, th, Z, r, s):
     return np.minimum(a, b)
 
 
+# ------------------------------------------------------ fractal patterns
+def _hash01(seed, *keys):
+    """Repeatable pseudo-random numbers in [0, 1), one per element of the
+    broadcast integer arrays `keys` (splitmix64)."""
+    keys = np.broadcast_arrays(*(np.asarray(k).astype(np.int64) for k in keys))
+    h = np.full(keys[0].shape, seed, np.uint64)
+    with np.errstate(over="ignore"):
+        for k in keys:
+            h = h ^ np.ascontiguousarray(k).view(np.uint64)
+            h = h + np.uint64(0x9E3779B97F4A7C15)
+            h = (h ^ (h >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
+            h = (h ^ (h >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
+            h = h ^ (h >> np.uint64(31))
+    return (h >> np.uint64(11)) / 2.0 ** 53
+
+
+def _level(c, i, n):
+    """Strut settings of level i (0 = coarsest) of an n-level fractal pattern:
+    strut_in / strut_out of block c are the finest level's, and each coarser
+    level's struts are `vein` times wider."""
+    k = c.vein ** (n - 1 - i)
+    return SimpleNamespace(strut_in=c.strut_in * k, strut_out=c.strut_out * k, center=c.center)
+
+
+def _tri(px, pz, side):
+    """Distance-like metric (negative inside) to an upward equilateral
+    triangle of the given side, centred on its centroid. Exact inside and
+    along the edges, so an offset of it keeps sharp corners."""
+    return np.maximum(-pz, pz / 2 + np.abs(px) * np.sqrt(3) / 2) - side / (2 * np.sqrt(3))
+
+
+def pat_sierpinski(pot, P, th, Z, r, s):
+    """Sierpinski gasket with the holes pointing up. The plane is a grid of
+    triangles of side a: the upward ones are the biggest holes, and each
+    downward one is a gasket: its middle (an upward triangle of half the
+    side) is a hole, and each of its three corners is a downward triangle
+    of half the side that gets the same again, `levels` - 1 sizes in all.
+    Every hole roof is two 60-degree sides, so there are no bridges. Struts
+    taper from strut_in to strut_out through the wall and the pattern moves
+    down by recession / cos(60) so the pointed tops stay put (`center`: see
+    taper_shift)."""
+    c = P.sierpinski
+    a = pot.circ / pot.count(c.cells)
+    h = a * np.sqrt(3) / 2
+    r3 = np.sqrt(3)
+    S, ZZ = unroll(pot, th, Z)
+    ZZ = ZZ + taper_shift(c, s, 0.5)
+    k = np.floor(ZZ / h)
+    m = np.floor((S + ZZ / r3) / a)
+    n = np.floor((S - ZZ / r3) / a)
+    up = (m - n - k) < 0.5                       # an upward triangle of the grid (else downward)
+    px = S - np.where(up, (n + k / 2 + 0.5) * a, (m - k / 2) * a)     # from its centroid
+    pz = ZZ - np.where(up, (k + 1 / 3) * h, (k + 2 / 3) * h)
+    hole = np.where(up, _tri(px, pz, a), np.inf)
+    A = a
+    for _ in range(c.levels - 1):
+        hole = np.minimum(hole, np.where(up, np.inf, _tri(px, pz, A / 2)))
+        # on into the corner triangle nearest the point; its centroid is halfway to that corner
+        R = A / r3
+        corners = ((-A / 2, R / 2), (A / 2, R / 2), (0.0, -R))
+        near = np.argmin([(px - x) ** 2 + (pz - z) ** 2 for x, z in corners], 0)
+        px = px - np.choose(near, [x for x, _ in corners]) / 2
+        pz = pz - np.choose(near, [z for _, z in corners]) / 2
+        A /= 2
+    return hole + taper(c, s) / 2
+
+
+def pat_trellis(pot, P, th, Z, r, s):
+    """Self-similar diamond trellis: the lattice's strips crossing at
+    +-SLOPE, and at each finer level every diamond split at random (chance
+    split[i]) into four half-size ones by thinner strips. No bridges, only
+    pointed diamond tops. Each level tapers through the wall like lattice,
+    moved down by its own recession / cos(SLOPE), measured from the soil
+    side so the levels stay lined up there (with center = 1 nothing moves)."""
+    c = P.trellis
+    n = pot.count(c.cells)
+    levels = len(c.split) + 1
+    S, ZZ = unroll(pot, th, Z)
+    cot, nz = 1 / np.tan(SLOPE), np.cos(SLOPE)
+    hole, active = -np.inf, True
+    for i in range(levels):
+        lc = _level(c, i, levels)
+        zz = ZZ + taper_shift(lc, s, nz) - taper_shift(lc, 0.0, nz)
+        p = pot.circ / (n * 2 ** i)
+        u, v = (S + zz * cot) / p, (S - zz * cot) / p          # in strip spacings of this level
+        if i > 0:
+            # this level's strips only run through the diamonds of the last one that split;
+            # (ku - kv, ku + kv mod 2N) names a diamond the same way on both sides of the seam
+            ku, kv = np.floor(u / 2), np.floor(v / 2)
+            N = n * 2 ** (i - 1)
+            active = active & (_hash01(c.seed, i, ku - kv, np.mod(ku + kv, 2 * N)) < c.split[i - 1])
+        d = np.minimum(stripes(u, 1.0), stripes(v, 1.0)) * p * np.sin(SLOPE)
+        hole = np.maximum(hole, np.where(active, taper(lc, s) / 2 - d, -np.inf))
+    return hole
+
+
+def pat_veins(pot, P, th, Z, r, s):
+    """Leaf veins / dried mud: `levels` voronoi networks laid over each
+    other, each with cells half the size of the last and struts `vein`
+    times thinner. The finest sets the hole size, the coarse ones are the
+    thick veins. Each tapers through the wall like voronoi (flat bridge
+    roofs no wider than the hole)."""
+    c = P.veins
+    S, ZZ = unroll(pot, th, Z)
+    S = S + c.warp * np.sin(2 * np.pi * Z / 47)
+    hole = -np.inf
+    for i in range(c.levels):
+        lc = _level(c, i, c.levels)
+        lc.cells = c.cells * 2 ** i
+        lc.row_h = c.row * 2 * np.pi * R0_REF / lc.cells
+        lc.jitter, lc.seed = c.jitter, c.seed + i
+        hole = np.maximum(hole, taper(lc, s) / 2 - voronoi_edge(pot, lc, S, ZZ + taper_shift(lc, s, 1.0)))
+    return hole
+
+
+def _seg_dist(p, q, a, b):
+    """Distance between the 2D segments pq and ab."""
+    def pt(x, u, v):
+        d = v - u
+        t = np.clip(np.dot(x - u, d) / max(np.dot(d, d), 1e-12), 0, 1)
+        return np.hypot(*(x - u - t * d))
+
+    def side(u, v, x):
+        return np.sign((v[0] - u[0]) * (x[1] - u[1]) - (v[1] - u[1]) * (x[0] - u[0]))
+    if side(p, q, a) * side(p, q, b) < 0 and side(a, b, p) * side(a, b, q) < 0:
+        return 0.0
+    return min(pt(p, a, b), pt(q, a, b), pt(a, p, q), pt(b, p, q))
+
+
+@lru_cache(maxsize=8)
+def _root_trees(pitch, row_h, settings):
+    """Root-like trees for pat_roots, each inside its pitch x row_h tile: a
+    list of (segments (m, 4) as x0, z0, x1, z1 from the tile centre, level
+    (m,)). A trunk hangs from the top of the tile and forks into two
+    branches `spread` degrees either side, down to `levels` sizes; branches
+    stay within max_angle of vertical, so every slot side is at least
+    90 - max_angle degrees steep. A branch only grows if its slot keeps
+    `gap` from the tile edge and from every slot it doesn't join (at the
+    outer face, where they are widest): holes never meet, so they can't
+    close a loop around a piece of wall. The tree grows one level at a
+    time, so no branch crowds out its sibling's whole subtree, and each
+    variant is the fullest of a few tries (an unlucky narrow fork can stop a
+    tree early). Half the trees are mirror images."""
+    c = SimpleNamespace(**dict(settings))
+    rng = np.random.default_rng(c.seed)
+    trees = []
+    for _ in range(c.variants):
+        segs = max((_grow_root(rng, c, pitch, row_h) for _ in range(4)), key=len)
+        seg = np.array([np.r_[a, b] for a, b, _, _ in segs])
+        lvl = np.array([lv for _, _, lv, _ in segs])
+        trees += [(seg, lvl), (seg * [-1, 1, -1, 1], lvl)]
+    return trees
+
+
+def _grow_root(rng, c, pitch, row_h):
+    """One tree for _root_trees: [(start, end, level, parent)]."""
+    top = np.deg2rad(c.max_angle)
+    segs = []                                       # (start, end, level, parent)
+    # branches to try, one level at a time: (start, angle, length, level, parent)
+    todo = [(np.array([0.0, row_h / 2 - c.width_out / 2 - c.gap / 2]), 0.0,
+             c.trunk * (1 + c.jitter * rng.uniform(-1, 1)), 0, -1)]
+    while todo:
+        start, ang, length, level, parent = todo.pop(0)
+        w = c.width_out * c.thin ** level
+        end = start + length * np.array([np.sin(ang), -np.cos(ang)])
+        # pat_roots moves the slots down by up to (width_out - width_in) / 2 outside
+        if abs(end[0]) > pitch / 2 - w / 2 - c.gap / 2 or                 -end[1] > row_h / 2 - w / 2 - c.gap / 2 - (c.width_out - c.width_in) / 2:
+            continue
+        if any(_seg_dist(start, end, a, b) < (w + c.width_out * c.thin ** lv) / 2 + c.gap
+               for k, (a, b, lv, par) in enumerate(segs)
+               if k != parent and par != parent):  # the parent and sibling join it at the fork
+            continue
+        segs.append((start, end, level, parent))
+        if level + 1 < c.levels:
+            sp = np.deg2rad(c.spread) * (1 + c.jitter * rng.uniform(-1, 1))
+            a1, a2 = ang - sp, ang + sp
+            if a2 > top:                            # slide the pair back inside +-max_angle
+                a1, a2 = a1 - (a2 - top), top
+            if a1 < -top:
+                a1, a2 = -top, a2 + (-top - a1)
+            for a_ in rng.permutation([a1, a2]):
+                todo.append((end, a_, length * c.ratio * (1 + c.jitter * rng.uniform(-1, 1)),
+                             level + 1, len(segs) - 1))
+    return segs
+
+
+ROOT_KEYS = ("trunk", "ratio", "spread", "max_angle", "levels", "width_in", "width_out", "thin", "gap", "jitter",
+             "seed", "variants")
+
+
+def pat_roots(pot, P, th, Z, r, s):
+    """Branching root slots: a fractal tree hanging in each cell of a
+    staggered grid, picked at random from a few variants (see _root_trees).
+    Slots widen from width_in on the soil side to width_out outside (each
+    fork `thin` times narrower); the pattern moves down by the widening so
+    the rounded trunk tops (the only roofs, bridges one slot wide) stay put.
+    Only the point's own tile is looked at; its slots stay gap / 2 inside
+    the tile, so capping the field there keeps it continuous across tiles."""
+    c = P.roots
+    n = pot.count(c.cells)
+    pitch = pot.circ / n
+    trees = _root_trees(pitch, c.row_h, tuple((k, getattr(c, k)) for k in ROOT_KEYS))
+    S, ZZ, s = np.broadcast_arrays(*unroll(pot, th, Z), s)
+    width = c.width_in + (c.width_out - c.width_in) * s     # trunk slot width at this depth
+    ZZ = ZZ + (width - c.width_in) / 2
+    j = np.floor(ZZ / c.row_h)
+    Ss = S - np.mod(j, 2) * pitch / 2
+    i = np.floor(Ss / pitch)
+    x, z = Ss - (i + 0.5) * pitch, ZZ - (j + 0.5) * c.row_h
+    pick = (_hash01(c.seed, np.mod(i, n), j) * len(trees)).astype(int)
+    hole = np.full(x.shape, np.inf, np.float32)
+    for t, (seg, lvl) in enumerate(trees):
+        sel = pick == t
+        px, pz, w = x[sel], z[sel], width[sel]
+        best = np.full(px.shape, np.inf)
+        for (x0, z0, x1, z1), lv in zip(seg, lvl):
+            dx, dz = x1 - x0, z1 - z0
+            u = np.clip(((px - x0) * dx + (pz - z0) * dz) / (dx * dx + dz * dz), 0, 1)
+            best = np.minimum(best, np.hypot(px - x0 - u * dx, pz - z0 - u * dz) - w * c.thin ** lv / 2)
+        hole[sel] = best
+    return np.minimum(hole, c.gap / 2)
+
+
+def _drop(px, pz, R):
+    """Teardrop of radius R (negative inside): its circle plus the SLOPE cap
+    up to the apex R / cos(SLOPE) above the centre, as in pat_drops."""
+    sb, cb = np.sin(SLOPE), np.cos(SLOPE)
+    cap = np.maximum(np.abs(px) * sb + pz * cb - R, R * cb - pz)
+    return np.minimum(np.hypot(px, pz) - R, cap)
+
+
+def _drop_outline():
+    """Points around a unit teardrop: apex, down both cap lines, the arc under the centre."""
+    tip = np.array([0, 1 / np.cos(SLOPE)])
+    a0 = np.pi / 2 - SLOPE
+    arc = np.linspace(a0, a0 - (np.pi + 2 * a0), 21)
+    ends = np.c_[np.cos(arc[[0, -1]]), np.sin(arc[[0, -1]])]
+    t = np.linspace(0.2, 0.8, 4)[:, None]
+    return np.concatenate([[tip], tip + t * (ends[0] - tip), tip + t * (ends[1] - tip),
+                           np.c_[np.cos(arc), np.sin(arc)]])
+
+
+@lru_cache(maxsize=8)
+def _bubble_grids(circ, height, radius, ratio, levels, jitter, spread, seed):
+    """Random packing of teardrop cells for pat_bubbles, biggest first. Level
+    i has candidate cells of radius radius * ratio^i (+- spread) on a
+    jittered grid of pitch ~2x that radius, tried in random order; one is
+    kept if it doesn't overlap a cell kept before it, so each size fills the
+    gaps the bigger ones left. Per level: (pitch, centres (rows, n, 2),
+    radii (rows, n), kept (rows, n)); row j is centred near (j - 0.5) pitch."""
+    rng = np.random.default_rng(seed)
+    outline = _drop_outline()
+    rmax = radius * (1 + spread)
+    nb = max(1, int(circ // (3.6 * rmax)))            # buckets around; a cell reaches < 1.8 rmax from its centre
+    bw = circ / nb
+    bucket = {}                                       # (column, row) -> [(S, Z, R)] of the kept cells
+    grids = []
+    for i in range(levels):
+        n = max(3, round(circ / (2 * radius * ratio ** i)))
+        w = circ / n
+        rows = int(np.ceil(height / w)) + 2
+        J, I = np.meshgrid(np.arange(rows), np.arange(n), indexing="ij")
+        cen = np.stack([(I + 0.5) * w, (J - 0.5) * w], -1) + rng.uniform(-jitter, jitter, (rows, n, 2)) * w
+        rad = radius * ratio ** i * (1 + spread * rng.uniform(-1, 1, (rows, n)))
+        kept = np.zeros((rows, n), bool)
+        for flat in rng.permutation(rows * n):
+            j, k = divmod(int(flat), n)
+            (cs, cz), R = cen[j, k], rad[j, k]
+            bs, bz = int(cs // bw) % nb, int(np.floor(cz / bw))
+            near = [q for ds in (-1, 0, 1) for dz in (-1, 0, 1) for q in bucket.get(((bs + ds) % nb, bz + dz), ())]
+            if near:
+                q = np.array(near)
+                dx = np.mod(q[:, 0] - cs + circ / 2, circ) - circ / 2        # the others' centres, from this one
+                dz = q[:, 1] - cz
+                mine = outline * R                                           # this outline vs the others ...
+                if (_drop(mine[None, :, 0] - dx[:, None], mine[None, :, 1] - dz[:, None], q[:, 2:3])
+                        < 0.03 * R).any():
+                    continue
+                theirs = outline[None] * q[:, 2, None, None]                  # ... and theirs vs this one
+                if (_drop(theirs[..., 0] + dx[:, None], theirs[..., 1] + dz[:, None], R) < 0.03 * R).any():
+                    continue
+            kept[j, k] = True
+            bucket.setdefault((bs, bz), []).append((cs, cz, R))
+        grids.append((w, cen, rad, kept))
+    return grids
+
+
+def pat_bubbles(pot, P, th, Z, r, s):
+    """Foam of teardrops in `levels` sizes (see _bubble_grids): the big ones
+    go first and each smaller size fills the gaps left, like an Apollonian
+    packing. A hole is its cell shrunk by half a strut, so holes stay a
+    strut apart; struts taper from strut_in to strut_out through the wall
+    and, as in drops, the pattern moves down so the 55-degree pointed tops
+    stay put (`center`: see taper_shift)."""
+    c = P.bubbles
+    grids = _bubble_grids(pot.circ, pot.height, c.radius, c.ratio, c.levels, c.jitter, c.spread, c.seed)
+    S, ZZ = unroll(pot, th, Z)
+    ZZ = ZZ + taper_shift(c, s, np.cos(SLOPE))
+    half = taper(c, s) / 2
+    # only the cells of a few grid cells around the point are looked at (two
+    # rows below: the caps reach up); any cell outside those is at least
+    # `reach` away, so capping the field there keeps it exact and continuous
+    reach = min(min((1.5 - c.jitter) * w - rad.max(), (2.5 - c.jitter) * w - rad.max() / np.cos(SLOPE))
+                for w, _, rad, _ in grids)
+    hole = reach
+    for w, cen, rad, kept in grids:
+        rows, n = kept.shape
+        i0 = np.floor(S / w).astype(int)
+        j0 = np.floor(ZZ / w).astype(int) + 1
+        for di in (-1, 0, 1):
+            for dj in (-2, -1, 0, 1):
+                i, j = i0 + di, np.clip(j0 + dj, 0, rows - 1)
+                k = np.mod(i, n)
+                cs = cen[j, k, 0] + (i - k) * w      # that centre, in the same turn as the point
+                d = _drop(S - cs, ZZ - cen[j, k, 1], rad[j, k] - half)
+                hole = np.minimum(hole, np.where(kept[j, k], d, np.inf))
+    return hole
+
+# a hole closed at some depth (a strut wider than its cell there) is cut
+# this small (mm) at its centre, far below what prints (as voronoi_cutters does)
+TINY = 0.005
+
+
+def sierpinski_cutters(pot, c, depths):
+    """The sierpinski holes for solid.py: (n, len(depths), 3, 2) triangles in
+    the unrolled (S, Z) plane. Every upward triangle of the grid is a hole;
+    each downward one (centroid C, side A) has the hole of side A / 2 at C,
+    and its three corner triangles, centred halfway from C to each corner,
+    get the same, as in pat_sierpinski. Each hole is its triangle with the
+    inradius cut by half a strut, moved down by the shift. A hole closed at
+    some depths (the smallest ones, on the soil side) shrinks to its
+    centroid there; one closed at every depth is left out."""
+    N = pot.count(c.cells)
+    a = pot.circ / N
+    h = a * np.sqrt(3) / 2
+    r3 = np.sqrt(3)
+    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
+    shift = np.array([taper_shift(c, s, 0.5) for s in depths])
+    half = np.array([taper(c, s) for s in depths]) / 2
+    margin = h + np.abs(shift).max()
+    k = np.arange(np.floor((lo - margin) / h), np.ceil((hi + margin) / h) + 1)
+    K, I = [x.ravel() for x in np.meshgrid(k, np.arange(N), indexing="ij")]
+    # the upward triangle n = I and the downward one m = I of row K, as in
+    # pat_sierpinski; I in [0, N) takes each once around the pot
+    cx, cz, side = [(I + K / 2 + 0.5) * a], [(K + 1 / 3) * h], [np.full(len(K), a)]
+    dx, dz, A = (I - K / 2) * a, (K + 2 / 3) * h, a
+    for _ in range(c.levels - 1):
+        cx.append(dx); cz.append(dz); side.append(np.full(len(dx), A / 2))
+        R = A / r3
+        half_way = np.array([(-A / 2, R / 2), (A / 2, R / 2), (0.0, -R)]) / 2
+        dx = (dx[:, None] + half_way[:, 0]).ravel()
+        dz = (dz[:, None] + half_way[:, 1]).ravel()
+        A /= 2
+    cx, cz, side = map(np.concatenate, (cx, cz, side))
+    rho = side[:, None] / (2 * r3) - half[None]                 # inradius at each depth (n, L)
+    keep = (rho.max(1) > TINY) & (cz + side / r3 > lo + shift.min()) & (cz - side / r3 < hi + shift.max())
+    cx, cz, rho = cx[keep], cz[keep], np.maximum(rho[keep], TINY)
+    unit = np.array([(0.0, 2.0), (r3, -1.0), (-r3, -1.0)])      # apex, bottom right, bottom left (inradius 1)
+    out = unit[None, None] * rho[..., None, None]
+    return out + np.stack([np.broadcast_to(cx[:, None], rho.shape), cz[:, None] - shift[None]], -1)[:, :, None]
+
+
+def trellis_cutters(pot, c, depths):
+    """The trellis holes for solid.py: a list of (n, len(depths), 4, 2)
+    parallelograms in the unrolled (S, Z) plane, one per diamond that isn't
+    split further. Starting from every lattice diamond (each once around the
+    pot, as in lattice_cutters), a diamond splits into four when
+    pat_trellis's hash says so. A side of a diamond lies on the strips of
+    every level that has a line there (the coarsest is the widest, but the
+    levels may be moved down differently): the hole is bounded by the
+    innermost of their edges. A hole closed at some depths shrinks to its
+    centre there."""
+    n = pot.count(c.cells)
+    levels = len(c.split) + 1
+    cot, nz, sn = 1 / np.tan(SLOPE), np.cos(SLOPE), np.sin(SLOPE)
+    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
+    lv = [_level(c, i, levels) for i in range(levels)]
+    # per level and depth: the shift, and half a strip measured along u (or v)
+    sh = np.array([[taper_shift(q, s, nz) - taper_shift(q, 0.0, nz) for s in depths] for q in lv])
+    hw = np.array([[taper(q, s) / (2 * sn) for s in depths] for q in lv])
+    p = pot.circ / n
+    m_ = np.abs(sh).max() + p / cot
+    half = pot.circ / 2
+    k = np.arange(np.floor((-half + (lo - m_) * cot) / p) - 1, np.ceil((half + (hi + m_) * cot) / p) + 1)
+    m = np.arange(np.floor((-half - (hi + m_) * cot) / p) - 1, np.ceil((half - (lo - m_) * cot) / p) + 1)
+    K, M = [a.ravel() for a in np.meshgrid(k, m)]
+    Zc = (K - M + 0.0) * p / (2 * cot)
+    keep = (K + M + 1 >= -n) & (K + M + 1 < n) & (Zc > lo - m_) & (Zc < hi + m_)
+    ku, kv = K[keep], M[keep]
+    leaves = []                                                  # (level, ku, kv) of the diamonds cut
+    for i in range(levels):
+        if i + 1 < levels:
+            split = _hash01(c.seed, i + 1, ku - kv, np.mod(ku + kv, 2 * n * 2 ** i)) < c.split[i]
+        else:
+            split = np.zeros(len(ku), bool)
+        leaves.append((i, ku[~split], kv[~split]))
+        ku, kv = ku[split], kv[split]
+        ku, kv = np.concatenate([2 * ku, 2 * ku, 2 * ku + 1, 2 * ku + 1]), \
+            np.concatenate([2 * kv, 2 * kv + 1, 2 * kv, 2 * kv + 1])
+
+    def edge(i, q, low, sign):
+        """Bound (L, n) on S + sign Z cot for the line at index q of level i:
+        the innermost strip edge of the levels that have a line there."""
+        coarsest = np.full(q.shape, i)
+        for t in range(1, i + 1):
+            coarsest = np.where(np.mod(q, 2 ** t) == 0, i - t, coarsest)
+        lvl = np.arange(levels)[:, None, None]
+        there = (lvl >= coarsest[None, None]) & (lvl <= i)        # (levels, 1, n)
+        # the strip edge on the hole's side, per level: q p_i +- hw - sign sh cot
+        e = q[None, None] * (p / 2 ** i) + (1 if low else -1) * hw[:, :, None] - sign * sh[:, :, None] * cot
+        e = np.where(there, e, -np.inf if low else np.inf)
+        return e.max(0) if low else e.min(0)
+
+    out = []
+    for i, ku, kv in leaves:
+        if not len(ku):
+            continue
+        A0, A1 = edge(i, ku, True, 1), edge(i, ku + 1, False, 1)
+        B0, B1 = edge(i, kv, True, -1), edge(i, kv + 1, False, -1)
+        opened = ((A1 - A0 > 2 * TINY) & (B1 - B0 > 2 * TINY)).any(0)
+        for a0, a1 in ((A0, A1), (B0, B1)):                      # closed at a depth: tiny, at the centre
+            mid, gap = (a0 + a1) / 2, np.maximum(a1 - a0, 2 * TINY)
+            a0[...], a1[...] = mid - gap / 2, mid + gap / 2
+        corners = [(A1, B0), (A1, B1), (A0, B1), (A0, B0)]          # top, right, bottom, left
+        o = np.stack([np.stack([(a + b) / 2, (a - b) / (2 * cot)], -1) for a, b in corners], 2)
+        o = o.transpose(1, 0, 2, 3)                              # (n, L, 4, 2)
+        z = o[..., 1]
+        out.append(o[opened & (z.max((1, 2)) > lo) & (z.min((1, 2)) < hi)])
+    return out
+
+
+def bubbles_cutters(pot, c, depths, arc=16):
+    """The bubbles holes for solid.py: (n, len(depths), arc + 1, 2)
+    teardrops (see _teardrop) in the unrolled (S, Z) plane, one per cell
+    _bubble_grids kept (each once around the pot: its centre is in
+    [0, circ)). The radius is the cell's minus half a strut, moved down as
+    in pat_bubbles; a hole closed at some depths shrinks to its centre there."""
+    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
+    grids = _bubble_grids(pot.circ, pot.height, c.radius, c.ratio, c.levels, c.jitter, c.spread, c.seed)
+    shift = np.array([taper_shift(c, s, np.cos(SLOPE)) for s in depths])
+    half = np.array([taper(c, s) for s in depths]) / 2
+    cen = np.concatenate([cen[kept] for _, cen, _, kept in grids])      # (n, 2)
+    rad = np.concatenate([rad[kept] for _, _, rad, kept in grids])
+    rho = rad[:, None] - half[None]                               # (n, L)
+    keep = (rho.max(1) > TINY) & (cen[:, 1] + 2 * rad > lo + shift.min()) & (cen[:, 1] - rad < hi + shift.max())
+    cen, rho = cen[keep], np.maximum(rho[keep], TINY)
+    out = _teardrop(arc)[None, None] * rho[..., None, None]
+    return out + np.stack([np.broadcast_to(cen[:, None, 0], rho.shape), cen[:, None, 1] - shift[None]], -1)[:, :, None]
+
+
 PATTERNS = {
     "voronoi": Pattern("2d", pat_voronoi, "organic cells flaring outward like funnels (default)",
                        cutters=voronoi_cutters),
@@ -656,4 +1114,12 @@ PATTERNS = {
     "spiral": Pattern("2d", pat_spiral, "slots on a many-start helix"),
     "chevrons": Pattern("2d", pat_chevrons, "stacked arrowhead slots"),
     "weave": Pattern("3d", pat_weave, "woven strips passing over and under"),
+    "sierpinski": Pattern("2d", pat_sierpinski, "fractal: Sierpinski gasket, upward triangles in 3 sizes",
+                          cutters=sierpinski_cutters),
+    "trellis": Pattern("2d", pat_trellis, "fractal: diamond trellis, diamonds split at random into smaller ones",
+                       cutters=trellis_cutters),
+    "veins": Pattern("2d", pat_veins, "fractal: voronoi within voronoi, thick veins and fine cells"),
+    "roots": Pattern("2d", pat_roots, "fractal: branching root-like slots"),
+    "bubbles": Pattern("2d", pat_bubbles, "fractal: foam of teardrops in 3 sizes, small ones in the gaps",
+                       cutters=bubbles_cutters),
 }
