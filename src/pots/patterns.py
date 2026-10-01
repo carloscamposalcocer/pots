@@ -343,11 +343,12 @@ def hex_cutters(pot, c, depths, per_edge=2):
 
 
 def pat_hex(pot, P, th, Z, r, s):
-    """Warped honeycomb, vertex pointing up, with the voronoi funnel: struts
-    thin from strut_in to strut_out through the wall. The roof edges have a
-    vertical normal component of sqrt(3)/2, so the pattern moves down by
+    """Honeycomb (regular by default; `warp` / `warp_z` make it wavy), vertex
+    pointing up, with the voronoi funnel: struts thin from strut_in to
+    strut_out through the wall. The roof edges have a vertical normal
+    component of sqrt(3)/2, so the pattern moves down by
     recession / (sqrt(3)/2) to keep every roof where it is. strut_extra
-    makes up for the warp, which shears the cells and thins some struts."""
+    makes up for a warp, which shears the cells and thins some struts."""
     c = P.hex
     strut = taper(c, s) + c.strut_extra
     shift = taper_shift(c, s, np.sqrt(3) / 2, c.strut_extra)
@@ -646,7 +647,7 @@ def pat_weave(pot, P, th, Z, r, s):
 PATTERNS = {
     "voronoi": Pattern("2d", pat_voronoi, "organic cells flaring outward like funnels (default)",
                        cutters=voronoi_cutters),
-    "hex": Pattern("2d", pat_hex, "warped honeycomb, pointy-top cells, flaring outward", cutters=hex_cutters),
+    "hex": Pattern("2d", pat_hex, "regular honeycomb, pointy-top cells, flaring outward", cutters=hex_cutters),
     "drops": Pattern("2d", pat_drops, "staggered teardrops flaring outward", cutters=drops_cutters),
     "lattice": Pattern("2d", pat_lattice, "diamond trellis of crossing helical strips, flaring outward",
                        cutters=lattice_cutters),
