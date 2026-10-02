@@ -41,15 +41,15 @@ patterns:
     jitter: 0.30      # randomness of the cell centres, fraction of a cell (0 = regular grid, keep < 0.5)
     seed: 7           # random seed: another number gives another cell layout
     warp: 1.2         # sideways wobble of the cells (amplitude)
-    strut_in: 2.2     # -> ~29% open, ~2.5 mm holes on the soil side
+    strut_in: 3     # -> ~29% open, ~2.5 mm holes on the soil side
     strut_out: 0.5    # -> ~78% open, ~4.2 mm holes outside (1.1 -> ~58%, ~3.6 mm)
     center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
   hex:
     cells: 66         # 66 -> ~6.1 mm flat-to-flat cells; the outer holes are then ~5 mm wide,
                       # the longest the 30-degree roofs should bridge, so don't go much lower
-    strut_in: 2.2     # -> ~42% open, ~3.8 mm holes
-    strut_out: 1.1    # -> ~67% open, ~4.7 mm holes
+    strut_in: 0.5     # -> ~42% open, ~3.8 mm holes
+    strut_out: 3    # -> ~67% open, ~4.7 mm holes
     center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
     strut_extra: 0.0  # added to every strut: a warp shears the cells and thins some struts (0.2 with warp 1.6)
     warp: 0.0         # sideways wobble of the cells (0 = regular hexagons)
