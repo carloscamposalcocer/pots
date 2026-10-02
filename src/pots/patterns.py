@@ -189,7 +189,7 @@ def _vor_sides(per, step):
     return np.concatenate([starts[:, [i]] + spans[:, [i]] * np.arange(k) / k for i, k in enumerate(pieces)], 1)
 
 
-def voronoi_cutters(pot, c, depths, step=np.deg2rad(24), fine=360, near=14):
+def voronoi_cutters(pot, c, depths, step=np.deg2rad(12), fine=360, near=14, face=0.1):
     """The voronoi holes for solid.py: a list of (n, len(depths), m, 2)
     outlines in the unrolled (S, Z) plane, grouped by point count m. In
     voronoi_edge's warped coordinates, a hole is where (F2 - F1) exceeds the
@@ -201,7 +201,9 @@ def voronoi_cutters(pot, c, depths, step=np.deg2rad(24), fine=360, near=14):
     and angles at most `step` apart. The points are then mapped back
     through the warp. Cells whose hole is closed at every depth are
     skipped; where a hole is closed at some depths only (a blind pocket),
-    its outline there shrinks to the seed, where the field's hole closes."""
+    its outline there shrinks to the seed, at the depth where the field's
+    hole closes (third coordinate; at least `face` mm inside a wall face,
+    or the tip would leave a sliver of a hole in it)."""
     nc, rh = pot.count(c.cells), c.row_h
     nr = int(pot.height / rh) + 3
     w = pot.circ / nc
@@ -253,12 +255,22 @@ def voronoi_cutters(pot, c, depths, step=np.deg2rad(24), fine=360, near=14):
         # closed at a depth: a tiny outline at the seed (0.01 mm, far below what prints)
         some = (t.min(-1) > 0.01).any(1)
         t, U, idx = np.maximum(t[some], 0.01), U[some], idx[some]
+        # the hole closes where the strut reaches the nearest seed (_vor_reach);
+        # the closed depths gather there, just apart (0.001 of their spacing)
+        sd = np.broadcast_to(depths, t.shape[:2]).copy()        # (g, L)
+        closed = t.max(-1) <= 0.01
+        if closed.any() and c.strut_out != c.strut_in:
+            sc = (np.sqrt((D[idx, 0] ** 2).sum(-1)) - c.strut_in) / (c.strut_out - c.strut_in)
+            opens = np.sign(c.strut_in - c.strut_out)            # the side where it is open
+            for f in (0.0, 1.0):
+                sc = np.where(np.abs(sc - f) < face / pot.wall, f + opens * face / pot.wall, sc)
+            sd = np.where(closed, sc[:, None] + 1e-3 * (sd - sc[:, None]), sd)
         Sw = own[idx, None, None, 0] + t * U[..., 0]
         Zw = own[idx, None, None, 1] + t * U[..., 1]
-        Z = Zw - shift[None, :, None]                            # voronoi_edge gets Z + shift ...
+        Z = Zw - taper_shift(c, sd, 1.0)[..., None]              # voronoi_edge gets Z + shift ...
         S = Sw - c.warp * np.sin(2 * np.pi * Z / 47)             # ... and S + warp sin(2 pi Z / 47)
         keep = (Z.max((1, 2)) > lo) & (Z.min((1, 2)) < hi)
-        out.append(np.stack([S, Z], -1)[keep])
+        out.append(np.stack([S, Z, np.broadcast_to(sd[..., None], S.shape)], -1)[keep])
     return out
 
 

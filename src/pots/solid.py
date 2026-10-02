@@ -12,7 +12,10 @@ array or a list of such arrays (holes with different point counts), or
 None when it can't (holes that close up inside the wall). Each outline must
 be star-shaped around its centroid, and point i of one outline must be
 point i of the next: the hole is the loft through its outlines. The holes
-may touch or overlap (they are then merged first, which is slower).
+may touch or overlap (they are then merged first, which is slower). An
+outline point may carry its own depth s as a third coordinate, (..., 3)
+instead of (..., 2): a hole that closes up inside the wall puts its tip
+where it closes, not at one of the depths.
 
 The first and last depth lie PAST mm beyond the wall faces (the outlines
 are extended past the faces, where they change nothing), so no cutter
@@ -115,7 +118,7 @@ def _split(pot, outlines):
     """Pieces per outline edge for a chord error below CHORD: the sag of a
     chord of length a on a curve of radius R is a^2 / 8R, around the pot
     (R = the smallest inner radius) and up the wall (1/R = the largest |r''|)."""
-    d = np.abs(np.roll(outlines, -1, 2) - outlines).reshape(-1, 2)
+    d = np.abs(np.roll(outlines, -1, 2) - outlines)[..., :2].reshape(-1, 2)
     if not len(d):
         return 1
     z = np.linspace(0, pot.height, 400)
@@ -127,7 +130,7 @@ def _split(pot, outlines):
 
 def _lofts(pot, outlines, s):
     """All holes as one triangle mesh of disjoint lofts: (vertices, faces)."""
-    n, L, m, _ = outlines.shape
+    n, L, m, k = outlines.shape
     # counter-clockwise in (S, Z), which is the view from outside
     x, y = outlines[:, 0, :, 0], outlines[:, 0, :, 1]
     cw = (x * np.roll(y, -1, 1) - y * np.roll(x, -1, 1)).sum(1) < 0
@@ -136,13 +139,19 @@ def _lofts(pot, outlines, s):
     split = _split(pot, outlines)
     t = np.arange(split) / split
     nxt = np.roll(outlines, -1, 2)
-    outlines = (outlines[..., None, :] * (1 - t[:, None]) + nxt[..., None, :] * t[:, None]).reshape(n, L, m * split, 2)
+    outlines = (outlines[..., None, :] * (1 - t[:, None]) + nxt[..., None, :] * t[:, None]).reshape(n, L, m * split, k)
     m *= split
     S, Z = outlines[..., 0], outlines[..., 1]
-    r = pot.r_in(Z) + s[None, :, None] * pot.wall
-    th = S / pot.r0
-    ring = np.stack([r * np.cos(th), r * np.sin(th), Z], -1)             # (n, L, m, 3)
-    caps = np.stack([ring[:, 0].mean(1), ring[:, -1].mean(1)], 1)       # (n, 2, 3)
+    s = outlines[..., 2] if outlines.shape[-1] > 2 else np.broadcast_to(s[None, :, None], S.shape)
+
+    def place(S, Z, s):
+        r = pot.r_in(Z) + s * pot.wall
+        return np.stack([r * np.cos(S / pot.r0), r * np.sin(S / pot.r0), Z], -1)
+    ring = place(S, Z, s)                                                # (n, L, m, 3)
+    # cap centres on the wall's curve (the mean of the ring points lies inside
+    # it, by up to PAST on a small pot with wide holes)
+    ends = [0, -1]
+    caps = place(*(a[:, ends].mean(-1) for a in (S, Z, s)))               # (n, 2, 3)
     per = L * m + 2
     verts = np.concatenate([ring.reshape(n, L * m, 3), caps], 1).reshape(-1, 3)
     j, i = np.meshgrid(np.arange(L - 1), np.arange(m), indexing="ij")
@@ -174,7 +183,7 @@ def _disjoint(pot, groups):
     for d in sorted({0, L // 2, L - 1}):
         polys, total = [], 0.0
         for g in groups:
-            P = g[:, d]                                       # (n, m, 2)
+            P = g[:, d, :, :2]                                # (n, m, 2)
             x, y = P[..., 0], P[..., 1]
             area = (x * np.roll(y, -1, 1) - y * np.roll(x, -1, 1)).sum(1) / 2
             P = np.where((area < 0)[:, None, None], P[:, ::-1], P)     # counter-clockwise

@@ -48,9 +48,9 @@ patterns:
   hex:
     cells: 66         # 66 -> ~6.1 mm flat-to-flat cells; the outer holes are then ~5 mm wide,
                       # the longest the 30-degree roofs should bridge, so don't go much lower
-    strut_in: 0.5     # -> ~42% open, ~3.8 mm holes
-    strut_out: 3    # -> ~67% open, ~4.7 mm holes
-    center: 0.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+    strut_in: 4     # -> ~42% open, ~3.8 mm holes
+    strut_out: 0.5    # -> ~67% open, ~4.7 mm holes
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
     strut_extra: 0.0  # added to every strut: a warp shears the cells and thins some struts (0.2 with warp 1.6)
     warp: 0.0         # sideways wobble of the cells (0 = regular hexagons)
     warp_z: 0.0       # up-and-down wobble

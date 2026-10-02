@@ -56,7 +56,7 @@ def test_warns_about_thin_struts(caplog):
     assert "too thin" not in caplog.text
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="pots"):
-        pot_from_config(load_config(["pattern=voronoi", "patterns.voronoi.strut_out=3"]))
+        pot_from_config(load_config(["pattern=voronoi", "patterns.voronoi.strut_in=2.2", "patterns.voronoi.strut_out=3"]))
     assert "narrow outward" in caplog.text
 
 

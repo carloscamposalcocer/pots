@@ -60,7 +60,7 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 | `shape` | `tapered` | Pot profile, see [Pot shapes](#pot-shapes). |
 | `size` | `small` | Size preset: `big` or `small`, see [Size presets](#size-presets-srcpotsconfigsize). |
 | `height` | from `size` | Pot height in mm. **Drives the whole shape**, see [Scaling](#scaling-with-height). Minimum `base + rim + 10` (17.4 mm). |
-| `preview` | `true` | Also render the PNG preview (~10 s). |
+| `preview` | `true` | Also render the PNG preview (~20 s). |
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `draft` | Mesh quality preset: `draft` (fast check) or `full` (for printing). |
 | `mesher` | `auto` | `auto`: exact geometry for the patterns that support it (the tapered ones: `voronoi`, `hex`, `drops`, `lattice`, `isogrid`), marching cubes for the others. `sdf`: marching cubes for every pattern. See [How the mesh is made](#how-the-mesh-is-made). |
