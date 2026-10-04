@@ -55,6 +55,10 @@ def test_warns_about_thin_struts(caplog):
         pot_from_config(load_config(["pattern=lattice"]))       # a thin outer edge is fine
     assert "too thin" not in caplog.text
     caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="pots"):                # so is a thin soil-side one
+        pot_from_config(load_config(["pattern=hex", "patterns.hex.strut_in=0.5", "patterns.hex.strut_out=3"]))
+    assert "too thin" not in caplog.text
+    caplog.clear()
     with caplog.at_level(logging.WARNING, logger="pots"):
         pot_from_config(load_config(["pattern=voronoi", "patterns.voronoi.strut_in=2.2", "patterns.voronoi.strut_out=3"]))
     assert "narrow outward" in caplog.text

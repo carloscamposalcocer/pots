@@ -78,14 +78,17 @@ BRIDGE_ROOFS = {"voronoi", "hex", "isogrid"}
 
 def check_pattern_params(cfg):
     """Warn about pattern settings that won't print well. A tapered strut is
-    a wedge through the wall, so only its soil side (strut_in) has to be
-    printable; a thinner outer edge is just trimmed by the slicer."""
+    a wedge through the wall, so only its thicker face (strut_in or
+    strut_out) has to be printable; the thin edge is just trimmed by the
+    slicer."""
     for name in (cfg.pattern, *PATTERNS[cfg.pattern].uses):
         c = cfg.patterns[name]
-        for key in ("strut", "strut_in"):
-            if key in c and c[key] < 1.1:
-                log.warning("patterns.%s.%s=%.2f mm is below ~1.1 mm, too thin for a 0.4 mm nozzle",
-                            name, key, c[key])
+        if "strut" in c and c.strut < 1.1:
+            log.warning("patterns.%s.strut=%.2f mm is below ~1.1 mm, too thin for a 0.4 mm nozzle",
+                        name, c.strut)
+        if "strut_in" in c and max(c.strut_in, c.strut_out) < 1.1:
+            log.warning("patterns.%s.strut_in=%.2f and strut_out=%.2f mm are both below ~1.1 mm, "
+                        "too thin for a 0.4 mm nozzle", name, c.strut_in, c.strut_out)
         if "strut_in" in c and c.strut_out > c.strut_in:
             log.warning("patterns.%s.strut_out > strut_in: the holes will narrow outward", name)
         if "center" in c:

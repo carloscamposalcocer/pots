@@ -25,7 +25,7 @@ A single-piece, support-free FDM plant pot. The wall should let in as much air a
 ## Printability rules (keep them)
 - No supports anywhere.
 - Every hole roof must be a flat bridge, no longer than the hole width (at most about 5 mm). The taper is done by shifting the pattern down by exactly the amount the edges recede, so holes only grow sideways and downward. Never let a hole ceiling rise toward the outside: that makes a sagging sloped ceiling. The one opt-in exception is the tapered patterns' `center` setting (0 to 1, `taper_shift` in patterns.py; set to 1 on voronoi, drops, lattice, isogrid by the user's choice): it moves the soil-side pattern down so holes are centred, and the CLI warns when it is set on the flat-bridge ones (voronoi, hex, isogrid).
-- Minimum strut is about 1.1 mm (0.4 mm nozzle) on the soil side (`strut`, `strut_in`; the CLI warns below it). A tapered strut is a wedge through the wall, so `strut_out` may be thinner: the slicer only trims the tip.
+- Minimum strut is about 1.1 mm (0.4 mm nozzle) (`strut`; the CLI warns below it). A tapered strut is a wedge through the wall, so either face may be thinner as long as the other is not: the CLI warns only when both `strut_in` and `strut_out` are below 1.1 (hex 0.5/3 is intentional: thin inside, thick outside).
 - 45-degree chamfer on the bottom outer edge (elephant foot).
 - Every pattern must be periodic around the circumference: integer cell counts, and warp terms with integer frequency in theta.
 

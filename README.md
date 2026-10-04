@@ -121,7 +121,7 @@ Keys most patterns share:
 |---|---|
 | `cells` | Cells around the pot at the 130 mm reference height; scaled with `height` (see [Scaling](#scaling-with-height)). More cells = smaller holes. |
 | `strut_in` | Tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`): strut width on the soil side (2.2 mm; `lattice` 3.0). Wider = smaller inner holes = less soil loss, less air. Keep ≥ ~1.1 (0.4 mm nozzle). |
-| `strut_out` | Tapered patterns: strut width on the outside (`voronoi` 0.5, `lattice` and `isogrid` 0.3, `hex` and `drops` 1.1 mm). Keep ≤ `strut_in` so holes widen outward. The strut is a wedge through the wall, so its outer edge may be thinner than the nozzle: the slicer just trims the tip and the outside holes get a little bigger. |
+| `strut_out` | Tapered patterns: strut width on the outside (`voronoi` 0.5, `lattice` and `isogrid` 0.3, `hex` and `drops` 1.1 mm). Keep ≤ `strut_in` so holes widen outward. The strut is a wedge through the wall, so one face may be thinner than the nozzle as long as the other is not (`pots` warns only when both are below ~1.1 mm): the slicer just trims the tip and the holes on that face get a little bigger. |
 | `center` | Tapered patterns, 0 to 1 (1 on `voronoi`, `drops`, `lattice`, `isogrid`; 0 on `hex`). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex` and `isogrid` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice` have 55° roofs and barely change. |
 
 With the defaults, on the 100 mm pot (6 mm wall):
@@ -232,8 +232,9 @@ The generator follows these; keep them when changing the code:
   never rises toward the outside. The exception is a tapered pattern's
   `center` setting, which trades that for centred holes (`pots` warns when
   it tilts a flat bridge: `voronoi`, `hex`, `isogrid`).
-- Minimum strut ~1.1 mm (0.4 mm nozzle) on the soil side; a tapered strut
-  may thin below that toward the outside, where it is a wedge tip.
+- Minimum strut ~1.1 mm (0.4 mm nozzle); a tapered strut is a wedge, so it
+  may thin below that on one face (its tip) as long as the other face is
+  at least that thick.
 - 45° chamfer on the bottom outer edge (elephant foot).
 - Every pattern is periodic around the circumference.
 
