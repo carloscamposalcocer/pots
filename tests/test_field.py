@@ -6,14 +6,20 @@ from pots.metrics import face_window, wall_metrics
 from pots.patterns import load_params
 
 
+# fine patterns: the cube patterns' rhombi are only ~3 mm across (their 30-degree
+# roofs can't bridge wider) and romanesco's holes 3.6 mm apart; 2.2 mm struts
+# would all but close them, so they get struts 1.4 / 0.7 mm
+NARROW = {"cubes", "voxel", "blocks", "romanesco"}
+
+
 def reference_params():
-    """The pattern settings with the tapered struts at the reference 2.2 / 1.1 mm,
-    so the metric tests check the pattern shapes, not the struts tuned in
-    patterns.yaml."""
+    """The pattern settings with the tapered struts at the reference 2.2 / 1.1 mm
+    (1.4 / 0.7 on the NARROW ones), so the metric tests check the pattern
+    shapes, not the struts tuned in patterns.yaml."""
     P = load_params()
-    for c in vars(P).values():
+    for name, c in vars(P).items():
         if hasattr(c, "strut_in"):
-            c.strut_in, c.strut_out = 2.2, 1.1
+            c.strut_in, c.strut_out = (1.4, 0.7) if name in NARROW else (2.2, 1.1)
     return P
 
 

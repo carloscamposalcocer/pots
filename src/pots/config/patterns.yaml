@@ -74,6 +74,41 @@ patterns:
     strut_out: 0.3    # -> ~85% open, ~3.8 mm holes
     center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
+  cubes:              # tumbling blocks: each cube is a top diamond and two side faces (60-degree
+                      # rhombi with vertical and 30-degree edges; the roofs are 30-degree tents, as on hex)
+    cells: 66         # cubes around; 66 -> 6.1 mm wide cubes, rhombi 3.5 mm a side. The diamond's
+                      # 30-degree roof then spans ~5.5 mm outside, the most it should bridge
+    strut_in: 1.4     # -> ~30% open, ~1.6 mm holes (the rhombi are only 3 mm across)
+    strut_out: 0.5    # -> ~69% open, ~2.4 mm holes
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+
+  voxel:              # the cubes reshuffled at random into stacks and hollows (random cube flips)
+    cells: 66         # as cubes
+    sweeps: 40        # rounds of random flips (0 = the plain tumbling blocks)
+    seed: 7           # random seed: another number gives another stacking
+    strut_in: 1.4     # -> ~30% open, ~1.6 mm holes
+    strut_out: 0.5    # -> ~69% open, ~2.4 mm holes
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+
+  blocks:             # notched isometric blocks: a cube with three corners cut away, so each face
+                      # is an L of three rhombi and the blocks interlock
+    cells: 44         # blocks around (rounded to an even number); 44 -> rhombi 3.5 mm a side
+    strut_in: 1.4     # -> ~46% open, ~1.8 mm holes
+    strut_out: 0.5    # -> ~78% open, ~2.7 mm holes
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+
+  romanesco:          # romanesco florets: holes on golden-angle spirals, small and round at each
+                      # floret's centre (the tip of the cone), growing into packed Voronoi cells
+                      # toward its edge
+    cells: 16         # florets around; 16 -> ~25 mm florets
+    row: 0.87         # row height, as a fraction of the floret width (0.87 = hexagonal packing)
+    spacing: 3.6      # mean distance between hole centres
+    small: 0.15       # hole size at a floret's centre, as a fraction of the size at its edge
+    seed: 7           # random seed for the turn of each floret
+    strut_in: 1.6     # -> ~23% open, ~1.6 mm holes; also the least gap between seeds is this + 1
+    strut_out: 0.5    # -> ~57% open, ~2.5 mm holes
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+
   leaves:             # echeveria leaves: pointed tips, a keel down the middle, staggered rows
     cells: 40         # 40 -> ~10 mm wide leaves (the keel halves the holes)
     row: 1.2          # row height, as a fraction of the leaf width (below ~1.19 the tips
