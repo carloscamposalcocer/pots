@@ -69,6 +69,12 @@ def pot_from_config(cfg):
         raise ValueError(f"unknown mesher '{cfg.mesher}'; choose from: {', '.join(MESHERS)}")
     pot = Pot(height=float(cfg.height), shape=str(cfg.shape), **{k: float(v) for k, v in cfg.design.items()})
     check_pattern_params(cfg)
+    if cfg.pattern == "leaves":
+        from .patterns import SLOPE, leaf_tip_slope, load_params
+        tip = leaf_tip_slope(pot, load_params(cfg.patterns).leaves)
+        if tip < np.degrees(SLOPE) - 0.05:
+            log.warning("patterns.leaves.warp=%g tilts the leaf tips to %.1f degrees, below %.0f; "
+                        "they may need support", cfg.patterns.leaves.warp, tip, np.degrees(SLOPE))
     return pot
 
 
@@ -89,6 +95,9 @@ def check_pattern_params(cfg):
         if "strut_in" in c and max(c.strut_in, c.strut_out) < 1.1:
             log.warning("patterns.%s.strut_in=%.2f and strut_out=%.2f mm are both below ~1.1 mm, "
                         "too thin for a 0.4 mm nozzle", name, c.strut_in, c.strut_out)
+        if "rib" in c and 0 < c.rib * max(c.strut_in, c.strut_out) < 1.1:
+            log.warning("patterns.%s.rib=%g makes the keel %.2f mm at most, too thin for a 0.4 mm nozzle",
+                        name, c.rib, c.rib * max(c.strut_in, c.strut_out))
         if "strut_in" in c and c.strut_out > c.strut_in:
             log.warning("patterns.%s.strut_out > strut_in: the holes will narrow outward", name)
         if "center" in c:

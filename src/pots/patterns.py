@@ -531,6 +531,175 @@ def drops_cutters(pot, c, depths, arc=16):
     return out
 
 
+LEAF_TIP = np.deg2rad(62)    # slope of the leaf tips; the sway (shear) may tilt them to SLOPE
+LEAF_WAVE = 40.0             # sway wavelength up the pot (mm) ...
+LEAF_TURNS = 3               # ... and the waves around it at H_REF (scaled, kept an integer: seamless)
+
+
+@lru_cache(maxsize=8)
+def _leaf_sizes(nr, nc, jitter, seed):
+    # per-leaf scale in [1 - jitter, 1] (smaller only, so the struts never thin)
+    return np.random.default_rng(seed).uniform(1 - jitter, 1, (nr, nc))
+
+
+def _leaf_grid(pot, c):
+    """Column pitch, row height, scale table and rows above/below a leaf centre
+    that a leaf can reach, for settings block c."""
+    n = pot.count(c.cells)
+    p = pot.circ / n
+    h = p * c.row
+    sizes = _leaf_sizes(int(pot.height / h) + 6, n, c.jitter, c.seed)
+    up = p / 2 / np.cos(LEAF_TIP) / h                 # apex above the centre, in rows
+    down = (c.length + c.base) * p / h                # base below the centre, in rows
+    return n, p, h, sizes, up, down
+
+
+def leaf_hole(px, pz, R, rb, L, w):
+    """Hole field of one leaf around its widest point (0, 0): the hull of a
+    circle of radius R there, one of radius rb at (0, -L) (the base) and an
+    apex where two LEAF_TIP lines tangent to the big circle meet, minus a
+    keel of half-width w down the middle. Struts are made by shrinking both
+    radii by half a strut: that moves every side in by exactly that much,
+    and a negative rb gives the pointed base the shrunk sides meet in."""
+    x = np.abs(px)
+    y = pz + L                                         # from the base centre
+    b = (rb - R) / L
+    a = np.sqrt(1 - b * b)
+    k = -b * x + a * y
+    hull = np.where(k < 0, np.hypot(x, y) - rb,
+                    np.where(k > a * L, np.hypot(x, pz) - R, a * x + b * y - rb))
+    st, ct = np.sin(LEAF_TIP), np.cos(LEAF_TIP)
+    tip = np.maximum(x * st + pz * ct - R, R * ct - pz)
+    return np.maximum(np.minimum(hull, tip), w - x)
+
+
+def _leaf_turns(pot):
+    return max(1, round(LEAF_TURNS * pot.k))
+
+
+def _leaf_warp(pot, c, S, Z):
+    """The sway: S in the pattern's (warped) coordinates."""
+    return S + c.warp * np.sin(2 * np.pi * Z / LEAF_WAVE + _leaf_turns(pot) * S / pot.r0)
+
+
+def leaf_tip_slope(pot, c):
+    """The shallowest leaf tip edge after the sway, in degrees from horizontal
+    (in the unrolled plane, like SLOPE): the sway shears the leaves by up to
+    2 pi warp / LEAF_WAVE and stretches them sideways by up to
+    1 / (1 - warp turns / r0)."""
+    shear = 2 * np.pi * c.warp / LEAF_WAVE
+    stretch = 1 - c.warp * _leaf_turns(pot) / pot.r0
+    run = (np.cos(LEAF_TIP) + shear * np.sin(LEAF_TIP)) / stretch
+    return float(np.degrees(np.arctan2(np.sin(LEAF_TIP), run)))
+
+
+def pat_leaves(pot, P, th, Z, r, s):
+    """Echeveria leaves: plump, broadest high up, with a short sharp LEAF_TIP
+    point, a keel down the middle and a narrow rounded base, in staggered
+    rows so each tip points up between two leaves of the row above. The
+    leaves differ a little in size (jitter) and sway in slow waves around
+    the pot (warp). Tapered like drops: struts (and the keel) thin from
+    strut_in to strut_out and the pattern moves down by recession /
+    cos(LEAF_TIP), so the pointed roofs stay put (unless `center`)."""
+    c = P.leaves
+    n, p, h, sizes, up, down = _leaf_grid(pot, c)
+    S, ZZ = unroll(pot, th, Z)
+    S = _leaf_warp(pot, c, S, Z)
+    ZZ = ZZ + taper_shift(c, s, np.cos(LEAF_TIP))
+    strut = taper(c, s)
+    j0 = np.floor(ZZ / h)
+    hole = np.full(S.shape, 1e9, np.float32)
+    for dj in range(int(np.floor(-0.5 - up)), int(np.ceil(0.5 + down)) + 1):
+        j = j0 + dj
+        off = np.mod(j, 2) * p / 2
+        i = np.floor((S - off) / p)
+        sc = sizes[np.clip(j + 2, 0, len(sizes) - 1).astype(int), i.astype(int) % n]
+        px = S - off - (i + 0.5) * p
+        pz = ZZ - (j + 0.5) * h
+        d = leaf_hole(px, pz, sc * p / 2 - strut / 2, sc * c.base * p - strut / 2, sc * c.length * p,
+                      c.rib * strut / 2)
+        hole = np.minimum(hole, d)
+    return hole
+
+
+def leaves_cutters(pot, c, depths, arc=32, keel=8):
+    """The leaves holes for solid.py: (n, len(depths), arc + keel + 1, 2)
+    outlines in the unrolled (S, Z) plane, one per half leaf (the keel
+    splits it). Each half is convex: its two corners on the keel, found by
+    bisection along it, `arc` points around the outside, at angles from a
+    point on the widest line evenly spaced between the corners', each found
+    by bisection along its ray on leaf_hole, and `keel` points up the keel.
+    Mapped back through the shift and the sway (fixed-point iteration),
+    which bends the keel. None if a half closes up."""
+    n, p, h, sizes, up, down = _leaf_grid(pot, c)
+    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
+    depths = np.asarray(depths)
+    strut = np.array([taper(c, s) for s in depths])
+    shift = np.array([taper_shift(c, s, np.cos(LEAF_TIP)) for s in depths])
+    margin = (up + down + 1) * h + np.abs(shift).max() + c.warp
+    J = np.arange(np.floor((lo - margin) / h), np.ceil((hi + margin) / h) + 1)
+    J, I = [x.ravel() for x in np.meshgrid(J, np.arange(n), indexing="ij")]
+    sc = sizes[np.clip(J + 2, 0, len(sizes) - 1).astype(int), I][:, None, None]     # (g, 1, 1)
+    R = sc * p / 2 - strut[None, :, None] / 2                                    # (g, L, 1)
+    rb = sc * c.base * p - strut[None, :, None] / 2
+    Lb = sc * c.length * p
+    w = c.rib * strut[None, :, None] / 2
+    if (R - w < 0.05).any():
+        return None
+
+    def bisect(x0, dx, dy, keel, steps=36):
+        """Distance from (x0, 0) (inside) along (dx, dy) to the edge of the
+        leaf, with or without its keel (to 4 p / 2^steps)."""
+        shape = np.broadcast(x0, dx, dy).shape
+        a, b = np.zeros(shape), np.full(shape, 4 * p)
+        for _ in range(steps):
+            m = (a + b) / 2
+            ok = leaf_hole(x0 + m * dx, m * dy, R, rb, Lb, w if keel else -np.inf) < 0
+            a, b = np.where(ok, m, a), np.where(ok, b, m)
+        return (a + b) / 2
+
+    # the right half; the left one is its mirror image
+    yt = bisect(w, 0.0, 1.0, False)                        # keel corners, (g, L, 1)
+    yb = -bisect(w, 0.0, -1.0, False)
+    cx = (w + R) / 2                                       # ray origin, on the widest line
+    a0 = np.arctan2(yt, w - cx)                            # top corner: up and left, in (90, 180) deg
+    a1 = np.arctan2(yb, w - cx)                            # bottom corner: down and left, in (-180, -90)
+    # clockwise round the right side: a fine pass, then `arc` angles evenly spaced along it
+    fine = a0 + (a1 - a0) * np.linspace(0, 1, 4 * arc + 1)
+    d = bisect(cx, np.cos(fine), np.sin(fine), True, steps=16)
+    px, py = cx + d * np.cos(fine), d * np.sin(fine)
+    along = np.concatenate([np.zeros(d.shape[:-1] + (1,)),
+                            np.cumsum(np.hypot(np.diff(px, axis=-1), np.diff(py, axis=-1)), -1)], -1)
+    want = along[..., -1:] * np.arange(1, arc + 1) / (arc + 1)
+    k = np.clip((along[..., None, :] <= want[..., None]).sum(-1) - 1, 0, 4 * arc - 1)
+    at = lambda a: np.take_along_axis(a, k, -1)
+    t = (want - at(along)) / at(np.diff(along, axis=-1).clip(1e-12))
+    ang = at(fine) + t * at(np.diff(fine, axis=-1))
+    dx, dy = np.cos(ang), np.sin(ang)
+    d = bisect(cx, dx, dy, True)
+    up_keel = yb + (yt - yb) * np.arange(keel) / keel      # bottom corner and up the keel (the sway bends it)
+    x = np.concatenate([np.broadcast_to(w, yt.shape), cx + d * dx, np.broadcast_to(w, up_keel.shape)], -1)
+    y = np.concatenate([yt, d * dy, up_keel], -1)          # (g, L, arc + keel + 1)
+    off = np.mod(J, 2) * p / 2
+    Sc = (off + (I + 0.5) * p)[:, None, None]
+    Zc = ((J + 0.5) * h)[:, None, None]
+    out = []
+    for sign in (1, -1):
+        Sw = Sc + sign * x
+        Zp = Zc + y
+        Z = Zp - shift[None, :, None]
+        S = Sw.copy()
+        for _ in range(60):                                # S + sway(S, Z) = Sw
+            S = Sw - c.warp * np.sin(2 * np.pi * Z / LEAF_WAVE + _leaf_turns(pot) * S / pot.r0)
+        err = np.abs(_leaf_warp(pot, c, S, Z) - Sw).max()
+        if err > 1e-6:
+            raise RuntimeError(f"leaves sway inversion did not converge ({err:.2g} mm)")
+        out.append(np.stack([S, Z], -1))
+    out = np.concatenate(out)
+    z = out[..., 1]
+    return out[(z.max((1, 2)) > lo) & (z.min((1, 2)) < hi)]
+
+
 def pat_spiral(pot, P, th, Z, r, s):
     """Slots along a many-start helix, staggered between neighbouring
     helices. Slot ends are cut level (a short flat bridge). The helix count
@@ -664,6 +833,8 @@ PATTERNS = {
     "lattice": Pattern("2d", pat_lattice, "diamond trellis of crossing helical strips, flaring outward",
                        cutters=lattice_cutters),
     "isogrid": Pattern("2d", pat_isogrid, "triangle grid, flaring outward", cutters=isogrid_cutters),
+    "leaves": Pattern("2d", pat_leaves, "echeveria leaves with a keel, staggered and swaying, flaring outward",
+                      cutters=leaves_cutters),
     "louvers": Pattern("2d", pat_louvers, "gills sloping down and out, no line of sight"),
     "slots": Pattern("2d", pat_slots, "narrow wavy vertical slots, air-pruning style"),
     "spiral": Pattern("2d", pat_spiral, "slots on a many-start helix"),

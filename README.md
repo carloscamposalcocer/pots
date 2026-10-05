@@ -63,7 +63,7 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 | `preview` | `true` | Also render the PNG preview (~20 s). |
 | `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `draft` | Mesh quality preset: `draft` (fast check) or `full` (for printing). |
-| `mesher` | `auto` | `auto`: exact geometry for the patterns that support it (the tapered ones: `voronoi`, `hex`, `drops`, `lattice`, `isogrid`), marching cubes for the others. `sdf`: marching cubes for every pattern. See [How the mesh is made](#how-the-mesh-is-made). |
+| `mesher` | `auto` | `auto`: exact geometry for the patterns that support it (the tapered ones: `voronoi`, `hex`, `drops`, `lattice`, `isogrid`, `leaves`), marching cubes for the others. `sdf`: marching cubes for every pattern. See [How the mesh is made](#how-the-mesh-is-made). |
 
 ### Size presets (`src/pots/config/size/`)
 
@@ -120,9 +120,9 @@ Keys most patterns share:
 | Key | Description |
 |---|---|
 | `cells` | Cells around the pot at the 130 mm reference height; scaled with `height` (see [Scaling](#scaling-with-height)). More cells = smaller holes. |
-| `strut_in` | Tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`): strut width on the soil side (2.2 mm; `lattice` 3.0). Wider = smaller inner holes = less soil loss, less air. Keep ≥ ~1.1 (0.4 mm nozzle). |
-| `strut_out` | Tapered patterns: strut width on the outside (`voronoi` 0.5, `lattice` and `isogrid` 0.3, `hex` and `drops` 1.1 mm). Keep ≤ `strut_in` so holes widen outward. The strut is a wedge through the wall, so one face may be thinner than the nozzle as long as the other is not (`pots` warns only when both are below ~1.1 mm): the slicer just trims the tip and the holes on that face get a little bigger. |
-| `center` | Tapered patterns, 0 to 1 (1 on `voronoi`, `drops`, `lattice`, `isogrid`; 0 on `hex`). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex` and `isogrid` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice` have 55° roofs and barely change. |
+| `strut_in` | Tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`, `leaves`): strut width on the soil side (2.2 mm; `lattice` 3.0). Wider = smaller inner holes = less soil loss, less air. Keep ≥ ~1.1 (0.4 mm nozzle). |
+| `strut_out` | Tapered patterns: strut width on the outside (`voronoi` 0.5, `lattice` and `isogrid` 0.3, `leaves` 0.8, `hex` and `drops` 1.1 mm). Keep ≤ `strut_in` so holes widen outward. The strut is a wedge through the wall, so one face may be thinner than the nozzle as long as the other is not (`pots` warns only when both are below ~1.1 mm): the slicer just trims the tip and the holes on that face get a little bigger. |
+| `center` | Tapered patterns, 0 to 1 (1 on `voronoi`, `drops`, `lattice`, `isogrid`, `leaves`; 0 on `hex`). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex` and `isogrid` (flat bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops`, `lattice` and `leaves` have pointed roofs and barely change. |
 
 With the defaults, on the 100 mm pot (6 mm wall):
 
@@ -133,6 +133,7 @@ With the defaults, on the 100 mm pot (6 mm wall):
 | `drops` | 56%, ~4.4 mm | 34%, ~3.4 mm |
 | `lattice` | 85%, ~4.1 mm | 13%, ~1.6 mm |
 | `isogrid` | 85%, ~3.8 mm | 24%, ~2.1 mm |
+| `leaves` | 62%, ~3.8 mm | 34%, ~2.7 mm |
 
 At 2.2 / 1.1 mm struts `voronoi` is 58% (3.6 mm) outside and 29% (2.5 mm)
 inside. `pots` logs these numbers for every build. The 55° roof slope and
@@ -190,9 +191,10 @@ from outside, next to a 40 x 30 mm true-scale swatch of the outer wall face
 |---|---|
 | **`voronoi`** (default), 2D, tapered: organic cells that flare outward like funnels. <br> ![voronoi](docs/patterns/voronoi.png) | **`hex`**, 2D, tapered: regular honeycomb, pointy-top cells about 6 mm across, flaring outward like `voronoi` (`warp` / `warp_z` make it wavy). <br> ![hex](docs/patterns/hex.png) |
 | **`drops`**, 2D, tapered: staggered teardrops with 55° pointed tops, flaring outward. <br> ![drops](docs/patterns/drops.png) | **`lattice`**, 2D, tapered: diamond trellis of helical strips crossing at ±55°, no bridges at all, flaring outward like `voronoi`. <br> ![lattice](docs/patterns/lattice.png) |
-| **`isogrid`**, 2D, tapered: triangle grid flaring outward like `voronoi`; the downward triangles have short flat bridges. <br> ![isogrid](docs/patterns/isogrid.png) | **`louvers`**, 2D: gills that run down and outward through the wall like shutter blades. No line of sight: soil stays in, rain runs off. <br> ![louvers](docs/patterns/louvers.png) |
-| **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) | **`spiral`**, 2D: slots on a many-start 60° helix. <br> ![spiral](docs/patterns/spiral.png) |
-| **`chevrons`**, 2D: stacked arrowhead slots. <br> ![chevrons](docs/patterns/chevrons.png) | **`weave`**, 3D: two sets of strips woven over and under through the wall (the swatch shows only where they touch the outer face). <br> ![weave](docs/patterns/weave.png) |
+| **`isogrid`**, 2D, tapered: triangle grid flaring outward like `voronoi`; the downward triangles have short flat bridges. <br> ![isogrid](docs/patterns/isogrid.png) | **`leaves`**, 2D, tapered: echeveria leaves, plump with a sharp 62° tip and a keel down the middle, in staggered rows that sway gently around the pot; sizes vary a little. Flares outward like `voronoi`. <br> ![leaves](docs/patterns/leaves.png) |
+| **`louvers`**, 2D: gills that run down and outward through the wall like shutter blades. No line of sight: soil stays in, rain runs off. <br> ![louvers](docs/patterns/louvers.png) | **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) |
+| **`spiral`**, 2D: slots on a many-start 60° helix. <br> ![spiral](docs/patterns/spiral.png) | **`chevrons`**, 2D: stacked arrowhead slots. <br> ![chevrons](docs/patterns/chevrons.png) |
+| **`weave`**, 3D: two sets of strips woven over and under through the wall (the swatch shows only where they touch the outer face). <br> ![weave](docs/patterns/weave.png) | |
 
 2D patterns are cut radially through the wall (louvers slope down through
 it). All wrap seamlessly around the pot.
@@ -279,8 +281,8 @@ reduced to its largest body and repaired. That works for any shape, but a
 grid can't follow a sharp edge that runs across it: flat ribs come out
 with sawtooth edges, and it takes many triangles.
 
-The tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`)
-can also give their hole outlines directly (`Pattern.cutters`). Then
+The tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`,
+`leaves`) can also give their hole outlines directly (`Pattern.cutters`). Then
 `solid.py` builds the pot exactly with
 [manifold3d](https://github.com/elalish/manifold): the plain pot is
 revolved from its profile, each hole is a loft from its soil-side outline
@@ -297,6 +299,7 @@ faces, 45 MB STL for every pattern):
 | `drops` | 3.1 s | 200 000 | 10 MB | 8 s |
 | `lattice` | 1.6 s | 99 000 | 5 MB | 6 s |
 | `isogrid` | 2.4 s | 179 000 | 9 MB | 7 s |
+| `leaves` | 3.5 s | 267 000 | 13 MB | 11 s |
 
 The exact mesh follows the field to within ~0.03 mm: the hole volume
 matches the field's within 1% on every shape and size (tested; most are

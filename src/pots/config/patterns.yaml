@@ -74,6 +74,21 @@ patterns:
     strut_out: 0.3    # -> ~85% open, ~3.8 mm holes
     center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
+  leaves:             # echeveria leaves: pointed tips, a keel down the middle, staggered rows
+    cells: 40         # 40 -> ~10 mm wide leaves (the keel halves the holes)
+    row: 1.2          # row height, as a fraction of the leaf width (below ~1.19 the tips
+                      # run into the leaves above)
+    length: 0.7       # how far the leaf narrows below its widest point, fraction of the width
+    base: 0.15        # radius of the rounded leaf base, fraction of the width
+                      # (row, length, base: longer leaves need taller rows or they merge)
+    rib: 0.6          # keel width, as a fraction of the strut (0 = no keel)
+    jitter: 0.12      # leaves shrink by up to this fraction at random (0 = all the same)
+    seed: 7           # random seed for the sizes
+    warp: 0.8         # sideways sway (amplitude); above ~0.9 the tips tilt below 55 degrees (pots warns)
+    strut_in: 2.2
+    strut_out: 0.8
+    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
+
   louvers:
     cells: 29         # slits per row
     pitch: 5.0        # row spacing

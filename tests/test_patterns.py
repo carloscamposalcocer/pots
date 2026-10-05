@@ -98,3 +98,36 @@ def test_center_is_checked(caplog):
     with caplog.at_level(logging.WARNING, logger="pots"):
         pot_from_config(load_config(["patterns.voronoi.center=1"]))
     assert "may sag" in caplog.text
+
+
+def test_leaves_stay_apart():
+    """Thin struts and no keel: still one hole per leaf (the tips fit under
+    the leaves above, the rows don't merge)."""
+    from scipy import ndimage
+    pot = Pot(height=100, wall=6.0)
+    P = load_params()
+    c = P.leaves
+    c.strut_in = c.strut_out = 0.3
+    c.rib, c.jitter = 0.0, 0.0
+    S, Z = np.meshgrid(np.arange(0, 60, 0.03), np.arange(30, 70, 0.03))
+    hole = PATTERNS["leaves"].fn(pot, P, S / pot.r0, Z, pot.r0, np.zeros_like(Z)) < 0
+    _, n = ndimage.label(hole)
+    p = pot.circ / pot.count(c.cells)
+    assert n >= 60 * 40 / (p * p * c.row)          # at least one per leaf in the window
+    assert hole.mean() < 0.97
+
+
+@pytest.mark.parametrize("h", [30, 50, 100, 130, 200])
+def test_leaf_tips_stay_steep(h):
+    """The sway shears the leaves; at the default warp the tips stay at SLOPE or steeper."""
+    from pots.patterns import SLOPE, leaf_tip_slope
+    assert leaf_tip_slope(Pot(height=h, wall=4.0), load_params().leaves) >= np.degrees(SLOPE)
+
+
+def test_warns_about_leaf_sway_and_keel(caplog):
+    with caplog.at_level(logging.WARNING, logger="pots"):
+        pot_from_config(load_config(["pattern=leaves"]))
+    assert not caplog.text
+    with caplog.at_level(logging.WARNING, logger="pots"):
+        pot_from_config(load_config(["pattern=leaves", "patterns.leaves.warp=2", "patterns.leaves.rib=0.3"]))
+    assert "tilts the leaf tips" in caplog.text and "keel" in caplog.text

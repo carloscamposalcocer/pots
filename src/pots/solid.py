@@ -128,6 +128,20 @@ def _split(pot, outlines):
     return max(1, int(np.ceil(np.sqrt(sag / CHORD))))
 
 
+def _cap_levels(pot, d):
+    """Steps from the rim of a loft's cap to its centre, for offsets d
+    (..., 2) of the rim points from the centre in (S, Z): a flat fan
+    strays d^2 / 8R from the curved wall (around the pot and up it, as in
+    _split); keep that under PAST / 3."""
+    if not d.size:
+        return 1
+    z = np.linspace(0, pot.height, 400)
+    r = pot.r_in(z)
+    bend = np.abs(np.gradient(np.gradient(r, z), z)).max()
+    sag = (d[..., 0] ** 2).max() / (8 * r.min()) + (d[..., 1] ** 2).max() * bend / 8
+    return max(1, int(np.ceil(np.sqrt(sag / (PAST / 3)))))
+
+
 def _lofts(pot, outlines, s):
     """All holes as one triangle mesh of disjoint lofts: (vertices, faces)."""
     n, L, m, k = outlines.shape
@@ -148,19 +162,40 @@ def _lofts(pot, outlines, s):
         r = pot.r_in(Z) + s * pot.wall
         return np.stack([r * np.cos(S / pot.r0), r * np.sin(S / pot.r0), Z], -1)
     ring = place(S, Z, s)                                                # (n, L, m, 3)
-    # cap centres on the wall's curve (the mean of the ring points lies inside
-    # it, by up to PAST on a small pot with wide holes)
+    # caps: a fan from a centre on the wall's curve (the mean of the ring
+    # points lies inside it, by up to PAST on a small pot with wide holes),
+    # through `levels` - 1 rings in between, also on the curve, where a long
+    # hole would make the fan sag into the wall (a sliver left uncut)
     ends = [0, -1]
-    caps = place(*(a[:, ends].mean(-1) for a in (S, Z, s)))               # (n, 2, 3)
-    per = L * m + 2
-    verts = np.concatenate([ring.reshape(n, L * m, 3), caps], 1).reshape(-1, 3)
+    cen = [a[:, ends].mean(-1) for a in (S, Z, s)]                        # (n, 2) each
+    levels = _cap_levels(pot, outlines[:, ends, :, :2] - np.stack(cen[:2], -1)[:, :, None])
+    q = np.arange(1, levels)[:, None, None, None] / levels               # (levels - 1, 1, 1, 1)
+    mid = place(*(a[:, ends] + (c[..., None] - a[:, ends]) * q for a, c in zip((S, Z, s), cen)))
+    caps = place(*cen)                                                   # (n, 2, 3)
+    # per hole: L rings, then for each end its rings in between and its centre
+    per = L * m + 2 * ((levels - 1) * m + 1)
+    cap_verts = [np.concatenate([mid[:, :, e].transpose(1, 0, 2, 3).reshape(n, -1, 3),
+                                 caps[:, e, None]], 1) for e in (0, 1)]
+    verts = np.concatenate([ring.reshape(n, L * m, 3)] + cap_verts, 1).reshape(-1, 3)
     j, i = np.meshgrid(np.arange(L - 1), np.arange(m), indexing="ij")
     a, b = j * m + i, j * m + (i + 1) % m
     c, d = b + m, a + m
     side = np.concatenate([np.stack([a, b, c], -1), np.stack([a, c, d], -1)]).reshape(-1, 3)
     i = np.arange(m)
-    inner = np.stack([np.full(m, L * m), (i + 1) % m, i], -1)            # faces the soil
-    outer = np.stack([np.full(m, L * m + 1), (L - 1) * m + i, (L - 1) * m + (i + 1) % m], -1)
+
+    def cap(end, start, flip):
+        """The faces of one cap: the end ring (index offset `end`), then the
+        rings in between and the centre from `start` on."""
+        loops = [end + i] + [start + k * m + i for k in range(levels - 1)]
+        centre = start + (levels - 1) * m
+        tris = []
+        for o, p in zip(loops, loops[1:]):
+            tris += [np.stack([p, np.roll(o, -1), o], -1), np.stack([p, np.roll(p, -1), np.roll(o, -1)], -1)]
+        tris.append(np.stack([np.full(m, centre), np.roll(loops[-1], -1), loops[-1]], -1))
+        tris = np.concatenate(tris)
+        return tris[:, ::-1] if flip else tris
+    inner = cap(0, L * m, False)                                         # faces the soil
+    outer = cap((L - 1) * m, L * m + (levels - 1) * m + 1, True)
     one = np.concatenate([side, inner, outer])
     faces = (one[None] + per * np.arange(n)[:, None, None]).reshape(-1, 3)
     return verts, faces
