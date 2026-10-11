@@ -12,3 +12,4 @@ output/
 # Tooling
 .pytest_cache/
 .claude/
+todo/
