@@ -1,5 +1,7 @@
 # Breathing plant pot
 
+![Printed pots: voronoi (blue), hex (terracotta) and a diamond lattice (green)](docs/photo.jpg)
+
 A single-piece, support-free, 3D-printable (FDM) plant pot. The wall is
 perforated to let in as much air as possible without losing soil, and a
 plain cup fused to the base catches drips and holds a small water reserve
@@ -8,6 +10,14 @@ that the soil wicks back up.
 The pot is generated from code (an implicit field meshed with marching
 cubes, or exact geometry for the patterns that support it) and exported
 as STL + 3MF, with a PNG preview.
+
+## Printed examples
+
+<p>
+  <img src="docs/photo-lineup.jpg" width="32%" alt="Four printed pots: voronoi barrel, hex, voronoi tapered and a diamond lattice">
+  <img src="docs/photo-hex.jpg" width="32%" alt="Hex pot in terracotta">
+  <img src="docs/photo-weave.jpg" width="32%" alt="Woven pot in purple">
+</p>
 
 ## Setup
 
