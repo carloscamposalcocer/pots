@@ -5,10 +5,10 @@ Every setting has a default in the packaged config/config.yaml; pass only what
 you change, as key=value (Hydra syntax, nested keys use dots).
 
 Examples
-    pots                              # quick draft build with the defaults (size=small)
+    pots                              # quick draft build with the defaults (size=big)
     pots quality=full                 # print-quality mesh (the file you print)
-    pots size=big                     # the 100 mm pot
-    pots size=big height=120          # start from a preset, change one value
+    pots size=small                   # the 50 mm pot
+    pots size=small height=65         # start from a preset, change one value
     pots pattern=hex                  # another pattern
     pots shape=barrel                 # another pot shape
     pots design.wall=4                # thinner wall (mm, does not scale)
@@ -24,10 +24,10 @@ Options
     -v, --verbose   debug logging
     -h, --help      this help
 
-Outputs (in `out`, default output/<pattern>_h<height>/):
-    pot_<pattern>.stl      print file
-    pot_<pattern>.3mf      same mesh, ~5x smaller file
-    pot_<pattern>.png      preview: outside view, cut-away, wall faces
+Outputs (in `out`, default output/<pattern>_<shape>_h<height>/):
+    <pattern>_<shape>_h<height>.stl   print file
+    <pattern>_<shape>_h<height>.3mf   same mesh, ~5x smaller file
+    <pattern>_<shape>_h<height>.png   preview: outside view, cut-away, wall faces
     config.yaml            the exact settings used
 """
 import logging
@@ -129,7 +129,8 @@ def run(cfg):
     out = Path(cfg.out)
     out.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(cfg, out / "config.yaml", resolve=True)
-    base = out / f"pot_{cfg.pattern}"
+    name = f"{cfg.pattern}_{cfg.shape}_h{cfg.height}"
+    base = out / name
     t = time.perf_counter()
     log.info("[1/3] building")
     m, field = generate(pot, cfg.pattern, q.voxel, q.faces, cfg.patterns, cfg.mesher)
@@ -145,7 +146,7 @@ def run(cfg):
     outs = [base.with_suffix(".stl"), base.with_suffix(".3mf")]
     if cfg.preview:
         log.info("[3/3] rendering preview")
-        render(m, field, pot, base.with_suffix(".png"), f"pot_{cfg.pattern}  (H {pot.height:g} mm)")
+        render(m, field, pot, base.with_suffix(".png"), f"{cfg.pattern}, {cfg.shape}  (H {pot.height:g} mm)")
         outs.append(base.with_suffix(".png"))
     else:
         log.info("[3/3] skipped preview")

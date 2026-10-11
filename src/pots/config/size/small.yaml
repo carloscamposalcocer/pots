@@ -1,6 +1,6 @@
 # @package _global_
 # Small pot: 50 mm tall, about 62 mm wide with the cup. Select with
-# size=small (the default). Any value here can still be overridden,
+# size=small. Any value here can still be overridden,
 # e.g. size=small height=65.
 
 # height (mm): overall pot height. Drives the whole shape: the radii,

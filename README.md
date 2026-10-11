@@ -35,10 +35,10 @@ All settings live in [`src/pots/config/config.yaml`](src/pots/config/config.yaml
 and have defaults. Override only what you want to change, as `key=value`:
 
 ```sh
-pots                                  # quick draft build with the defaults (size=small)
+pots                                  # quick draft build with the defaults (size=big)
 pots quality=full                     # print-quality mesh, use this for the file you print
-pots size=big                         # the 100 mm pot
-pots size=big height=120              # start from a preset, change one value
+pots size=small                       # the 50 mm pot
+pots size=small height=65             # start from a preset, change one value
 pots pattern=hex design.wall=4        # another pattern, thinner wall
 pots height=65 --show                 # print the final settings, don't build
 pots --all                            # every pattern, one after another
@@ -51,13 +51,13 @@ Settings use Hydra/OmegaConf syntax, so nested keys use dots
 
 ### Outputs
 
-Written to `out` (default `output/<pattern>_h<height>/`):
+Written to `out` (default `output/<pattern>_<shape>_h<height>/`):
 
 | File | What |
 |---|---|
-| `pot_<pattern>.stl` | print file |
-| `pot_<pattern>.3mf` | same mesh, ~5x smaller |
-| `pot_<pattern>.png` | preview: outside, cut-away, vertical section, both wall faces at true scale with their open % |
+| `<pattern>_<shape>_h<height>.stl` | print file |
+| `<pattern>_<shape>_h<height>.3mf` | same mesh, ~5x smaller |
+| `<pattern>_<shape>_h<height>.png` | preview: outside, cut-away, vertical section, both wall faces at true scale with their open % |
 | `config.yaml` | the exact settings used for this pot |
 
 ## Parameters
@@ -68,18 +68,18 @@ Written to `out` (default `output/<pattern>_h<height>/`):
 |---|---|---|
 | `pattern` | `voronoi` | Wall pattern, see [Patterns](#patterns). |
 | `shape` | `tapered` | Pot profile, see [Pot shapes](#pot-shapes). |
-| `size` | `small` | Size preset: `big` or `small`, see [Size presets](#size-presets-srcpotsconfigsize). |
+| `size` | `big` | Size preset: `big` or `small`, see [Size presets](#size-presets-srcpotsconfigsize). |
 | `height` | from `size` | Pot height in mm. **Drives the whole shape**, see [Scaling](#scaling-with-height). Minimum `base + rim + 10` (17.4 mm). |
 | `preview` | `true` | Also render the PNG preview (~20 s). |
-| `out` | `output/${pattern}_h${height}` | Output folder; existing files are overwritten. |
+| `out` | `output/${pattern}_${shape}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `draft` | Mesh quality preset: `draft` (fast check) or `full` (for printing). |
 | `mesher` | `auto` | `auto`: exact geometry for the patterns that support it (the tapered ones: `voronoi`, `hex`, `drops`, `lattice`, `isogrid`), marching cubes for the others. `sdf`: marching cubes for every pattern. See [How the mesh is made](#how-the-mesh-is-made). |
 
 ### Size presets (`src/pots/config/size/`)
 
 Each preset sets the height and the wall thickness. Anything on the
-command line still wins, so `size=big height=110` is a big pot made
-110 mm tall.
+command line still wins, so `size=small height=65` is a small pot made
+65 mm tall.
 
 | Key | `big` | `small` |
 |---|---|---|
@@ -192,7 +192,7 @@ sits just outside the widest part of the wall above it.
 
 ## Patterns
 
-Pick one with `pattern=<name>`. Each image shows the 50 mm pot (`size=small`)
+Pick one with `pattern=<name>`. Each image shows the 50 mm pot (`pots-gallery size=small`)
 from outside, next to a 40 x 30 mm true-scale swatch of the outer wall face
 (white = open) with its open %.
 
@@ -217,12 +217,12 @@ writes only these images to `docs/patterns/<name>.png` (no STL, 3MF or
 config; use `pots pattern=<name>` for a printable pot).
 
 ```sh
-pots-gallery                          # every pattern (a few minutes in total)
-pots-gallery hex slots                # only these
+pots-gallery size=small               # every pattern, as in this README (a few minutes)
+pots-gallery hex slots                # only these (100 mm pot by default)
 pots-gallery quality=draft            # faster, coarser
-pots-gallery size=big --images pics   # the 100 mm pot, images in pics/
+pots-gallery --images pics            # images in pics/
 pots-gallery height=90 design.wall=5  # any shape setting of `pots`
-pots-gallery --shapes size=big        # only docs/shapes.png: every pot shape (~1 min)
+pots-gallery --shapes                 # only docs/shapes.png: every pot shape (~1 min)
 ```
 
 It takes the shape settings of `pots` (`size`, `height`, `design.*`,

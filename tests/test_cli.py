@@ -8,7 +8,7 @@ from pots.patterns import PATTERNS
 def test_defaults_compose():
     cfg = load_config([])
     assert cfg.quality.voxel == 0.6      # draft by default
-    assert cfg.out == f"output/{cfg.pattern}_h{cfg.height}"
+    assert cfg.out == f"output/{cfg.pattern}_{cfg.shape}_h{cfg.height}"
 
 
 def test_overrides():
@@ -63,7 +63,7 @@ def test_all_configs(capsys):
     main(["--all", "--show", "height=65"])
     out = capsys.readouterr().out.splitlines()
     assert len(out) == len(PATTERNS)
-    assert "hex             -> output/hex_h65" in out
+    assert "hex             -> output/hex_tapered_h65" in out
     main(["--all", "--show", "out=pics"])
     assert "hex             -> pics/hex" in capsys.readouterr().out
     with pytest.raises(SystemExit, match="drop pattern"):

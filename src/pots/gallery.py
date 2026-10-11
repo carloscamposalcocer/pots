@@ -9,17 +9,17 @@ another (never in parallel: memory), well under a minute each at the default
 quality.
 
 Usage
-    pots-gallery                         # every pattern -> docs/patterns/<name>.png
+    pots-gallery size=small              # every pattern -> docs/patterns/<name>.png (README)
     pots-gallery hex slots               # only these
     pots-gallery quality=draft           # faster, coarser
-    pots-gallery size=big --images pics  # the 100 mm pot, images in pics/
+    pots-gallery --images pics           # images in pics/
     pots-gallery height=90 design.wall=5
-    pots-gallery --shapes size=big       # only the pot shape sheet -> docs/shapes.png
+    pots-gallery --shapes                # only the pot shape sheet -> docs/shapes.png
                                          # (every shape built with the config's pattern)
 
 Takes the shape settings of `pots` (size, height, design.*, patterns.*, quality); `pattern`,
 `out` and `preview` don't apply. The pot defaults to the config's size preset
-(small). Mesh quality defaults to quality.voxel=0.35 quality.faces=400000,
+(big; the README images use size=small). Mesh quality defaults to quality.voxel=0.35 quality.faces=400000,
 between draft and full and fine enough for 1.1 mm struts to show;
 quality=... or quality.* replaces that.
 """

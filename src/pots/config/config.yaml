@@ -3,9 +3,9 @@
 #
 # Every value here is a default: override any of them on the command
 # line with key=value, no need to edit this file.
-#   pots size=big                  # the 100 mm pot
+#   pots size=small                # the 50 mm pot
 #   pots quality=full              # print-quality mesh (default: draft)
-#   pots size=big height=120       # start from a preset, change one value
+#   pots size=small height=65      # start from a preset, change one value
 #   pots --show                    # print the final settings, no build
 # See README.md for the full description of each parameter.
 # =====================================================================
@@ -18,7 +18,7 @@ defaults:
   - quality: draft
   # Pot size preset: `big` (100 mm) or `small` (50 mm), files in
   # config/size/. Sets `height` and `design.wall`.
-  - size: small
+  - size: big
   # Settings of every wall pattern (cell size, struts, ...), one block per
   # pattern: config/patterns.yaml. Override as patterns.<name>.<key>=value.
   - patterns
@@ -73,9 +73,10 @@ mesher: auto
 preview: true
 
 # out: output folder. It gets the .stl, the .3mf, the .png and a
-# config.yaml with the exact settings used. ${pattern} and ${height} are
+# config.yaml with the exact settings used, all named
+# <pattern>_<shape>_h<height>. ${pattern}, ${shape} and ${height} are
 # filled in automatically; an existing folder is overwritten.
-out: output/${pattern}_h${height}
+out: output/${pattern}_${shape}_h${height}
 
 # ---------------------------------------------------------------------
 # design: print-physics sizes in mm. They stay the same at every height
