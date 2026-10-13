@@ -7,9 +7,9 @@ from pots.patterns import load_params
 
 
 # fine patterns: the cube patterns' rhombi are only ~3 mm across (their 30-degree
-# roofs can't bridge wider) and romanesco's holes 3.6 mm apart; 2.2 mm struts
-# would all but close them, so they get struts 1.4 / 0.7 mm
-NARROW = {"cubes", "voxel", "blocks", "romanesco"}
+# roofs can't bridge wider); 2.2 mm struts would all but close them, so they get
+# struts 1.4 / 0.7 mm
+NARROW = {"cubes", "voxel"}
 
 
 def reference_params():
@@ -70,7 +70,7 @@ def test_flat_bottom(name):
     assert (f(r, y, np.full_like(r, 0.05)) < 0).all()
 
 
-@pytest.mark.parametrize("name", ["voronoi", "hex", "drops", "lattice", "isogrid", "leaves"])
+@pytest.mark.parametrize("name", ["voronoi", "hex", "drops", "lattice", "isogrid"])
 def test_tapered_patterns_open_outward(name):
     pot = Pot()
     m = wall_metrics(make_field(pot, name, reference_params()), pot, face_window(pot, 40, 30))

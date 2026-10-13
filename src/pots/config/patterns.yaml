@@ -90,40 +90,6 @@ patterns:
     strut_out: 0.5    # -> ~69% open, ~2.4 mm holes
     center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
 
-  blocks:             # notched isometric blocks: a cube with three corners cut away, so each face
-                      # is an L of three rhombi and the blocks interlock
-    cells: 44         # blocks around (rounded to an even number); 44 -> rhombi 3.5 mm a side
-    strut_in: 1.4     # -> ~46% open, ~1.8 mm holes
-    strut_out: 0.5    # -> ~78% open, ~2.7 mm holes
-    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
-
-  romanesco:          # romanesco florets: holes on golden-angle spirals, small and round at each
-                      # floret's centre (the tip of the cone), growing into packed Voronoi cells
-                      # toward its edge
-    cells: 16         # florets around; 16 -> ~25 mm florets
-    row: 0.87         # row height, as a fraction of the floret width (0.87 = hexagonal packing)
-    spacing: 3.6      # mean distance between hole centres
-    small: 0.15       # hole size at a floret's centre, as a fraction of the size at its edge
-    seed: 7           # random seed for the turn of each floret
-    strut_in: 1.6     # -> ~23% open, ~1.6 mm holes; also the least gap between seeds is this + 1
-    strut_out: 0.5    # -> ~57% open, ~2.5 mm holes
-    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
-
-  leaves:             # echeveria leaves: pointed tips, a keel down the middle, staggered rows
-    cells: 40         # 40 -> ~10 mm wide leaves (the keel halves the holes)
-    row: 1.2          # row height, as a fraction of the leaf width (below ~1.19 the tips
-                      # run into the leaves above)
-    length: 0.7       # how far the leaf narrows below its widest point, fraction of the width
-    base: 0.15        # radius of the rounded leaf base, fraction of the width
-                      # (row, length, base: longer leaves need taller rows or they merge)
-    rib: 0.6          # keel width, as a fraction of the strut (0 = no keel)
-    jitter: 0.12      # leaves shrink by up to this fraction at random (0 = all the same)
-    seed: 7           # random seed for the sizes
-    warp: 0.8         # sideways sway (amplitude); above ~0.9 the tips tilt below 55 degrees (pots warns)
-    strut_in: 2.2
-    strut_out: 0.8
-    center: 1.0       # 0 = roofs level, holes grow downward; 1 = holes centred (soil side moved down); see top of file
-
   louvers:
     cells: 29         # slits per row
     pitch: 5.0        # row spacing

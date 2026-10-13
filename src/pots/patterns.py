@@ -531,175 +531,6 @@ def drops_cutters(pot, c, depths, arc=16):
     return out
 
 
-LEAF_TIP = np.deg2rad(62)    # slope of the leaf tips; the sway (shear) may tilt them to SLOPE
-LEAF_WAVE = 40.0             # sway wavelength up the pot (mm) ...
-LEAF_TURNS = 3               # ... and the waves around it at H_REF (scaled, kept an integer: seamless)
-
-
-@lru_cache(maxsize=8)
-def _leaf_sizes(nr, nc, jitter, seed):
-    # per-leaf scale in [1 - jitter, 1] (smaller only, so the struts never thin)
-    return np.random.default_rng(seed).uniform(1 - jitter, 1, (nr, nc))
-
-
-def _leaf_grid(pot, c):
-    """Column pitch, row height, scale table and rows above/below a leaf centre
-    that a leaf can reach, for settings block c."""
-    n = pot.count(c.cells)
-    p = pot.circ / n
-    h = p * c.row
-    sizes = _leaf_sizes(int(pot.height / h) + 6, n, c.jitter, c.seed)
-    up = p / 2 / np.cos(LEAF_TIP) / h                 # apex above the centre, in rows
-    down = (c.length + c.base) * p / h                # base below the centre, in rows
-    return n, p, h, sizes, up, down
-
-
-def leaf_hole(px, pz, R, rb, L, w):
-    """Hole field of one leaf around its widest point (0, 0): the hull of a
-    circle of radius R there, one of radius rb at (0, -L) (the base) and an
-    apex where two LEAF_TIP lines tangent to the big circle meet, minus a
-    keel of half-width w down the middle. Struts are made by shrinking both
-    radii by half a strut: that moves every side in by exactly that much,
-    and a negative rb gives the pointed base the shrunk sides meet in."""
-    x = np.abs(px)
-    y = pz + L                                         # from the base centre
-    b = (rb - R) / L
-    a = np.sqrt(1 - b * b)
-    k = -b * x + a * y
-    hull = np.where(k < 0, np.hypot(x, y) - rb,
-                    np.where(k > a * L, np.hypot(x, pz) - R, a * x + b * y - rb))
-    st, ct = np.sin(LEAF_TIP), np.cos(LEAF_TIP)
-    tip = np.maximum(x * st + pz * ct - R, R * ct - pz)
-    return np.maximum(np.minimum(hull, tip), w - x)
-
-
-def _leaf_turns(pot):
-    return max(1, round(LEAF_TURNS * pot.k))
-
-
-def _leaf_warp(pot, c, S, Z):
-    """The sway: S in the pattern's (warped) coordinates."""
-    return S + c.warp * np.sin(2 * np.pi * Z / LEAF_WAVE + _leaf_turns(pot) * S / pot.r0)
-
-
-def leaf_tip_slope(pot, c):
-    """The shallowest leaf tip edge after the sway, in degrees from horizontal
-    (in the unrolled plane, like SLOPE): the sway shears the leaves by up to
-    2 pi warp / LEAF_WAVE and stretches them sideways by up to
-    1 / (1 - warp turns / r0)."""
-    shear = 2 * np.pi * c.warp / LEAF_WAVE
-    stretch = 1 - c.warp * _leaf_turns(pot) / pot.r0
-    run = (np.cos(LEAF_TIP) + shear * np.sin(LEAF_TIP)) / stretch
-    return float(np.degrees(np.arctan2(np.sin(LEAF_TIP), run)))
-
-
-def pat_leaves(pot, P, th, Z, r, s):
-    """Echeveria leaves: plump, broadest high up, with a short sharp LEAF_TIP
-    point, a keel down the middle and a narrow rounded base, in staggered
-    rows so each tip points up between two leaves of the row above. The
-    leaves differ a little in size (jitter) and sway in slow waves around
-    the pot (warp). Tapered like drops: struts (and the keel) thin from
-    strut_in to strut_out and the pattern moves down by recession /
-    cos(LEAF_TIP), so the pointed roofs stay put (unless `center`)."""
-    c = P.leaves
-    n, p, h, sizes, up, down = _leaf_grid(pot, c)
-    S, ZZ = unroll(pot, th, Z)
-    S = _leaf_warp(pot, c, S, Z)
-    ZZ = ZZ + taper_shift(c, s, np.cos(LEAF_TIP))
-    strut = taper(c, s)
-    j0 = np.floor(ZZ / h)
-    hole = np.full(S.shape, 1e9, np.float32)
-    for dj in range(int(np.floor(-0.5 - up)), int(np.ceil(0.5 + down)) + 1):
-        j = j0 + dj
-        off = np.mod(j, 2) * p / 2
-        i = np.floor((S - off) / p)
-        sc = sizes[np.clip(j + 2, 0, len(sizes) - 1).astype(int), i.astype(int) % n]
-        px = S - off - (i + 0.5) * p
-        pz = ZZ - (j + 0.5) * h
-        d = leaf_hole(px, pz, sc * p / 2 - strut / 2, sc * c.base * p - strut / 2, sc * c.length * p,
-                      c.rib * strut / 2)
-        hole = np.minimum(hole, d)
-    return hole
-
-
-def leaves_cutters(pot, c, depths, arc=32, keel=8):
-    """The leaves holes for solid.py: (n, len(depths), arc + keel + 1, 2)
-    outlines in the unrolled (S, Z) plane, one per half leaf (the keel
-    splits it). Each half is convex: its two corners on the keel, found by
-    bisection along it, `arc` points around the outside, at angles from a
-    point on the widest line evenly spaced between the corners', each found
-    by bisection along its ray on leaf_hole, and `keel` points up the keel.
-    Mapped back through the shift and the sway (fixed-point iteration),
-    which bends the keel. None if a half closes up."""
-    n, p, h, sizes, up, down = _leaf_grid(pot, c)
-    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
-    depths = np.asarray(depths)
-    strut = np.array([taper(c, s) for s in depths])
-    shift = np.array([taper_shift(c, s, np.cos(LEAF_TIP)) for s in depths])
-    margin = (up + down + 1) * h + np.abs(shift).max() + c.warp
-    J = np.arange(np.floor((lo - margin) / h), np.ceil((hi + margin) / h) + 1)
-    J, I = [x.ravel() for x in np.meshgrid(J, np.arange(n), indexing="ij")]
-    sc = sizes[np.clip(J + 2, 0, len(sizes) - 1).astype(int), I][:, None, None]     # (g, 1, 1)
-    R = sc * p / 2 - strut[None, :, None] / 2                                    # (g, L, 1)
-    rb = sc * c.base * p - strut[None, :, None] / 2
-    Lb = sc * c.length * p
-    w = c.rib * strut[None, :, None] / 2
-    if (R - w < 0.05).any():
-        return None
-
-    def bisect(x0, dx, dy, keel, steps=36):
-        """Distance from (x0, 0) (inside) along (dx, dy) to the edge of the
-        leaf, with or without its keel (to 4 p / 2^steps)."""
-        shape = np.broadcast(x0, dx, dy).shape
-        a, b = np.zeros(shape), np.full(shape, 4 * p)
-        for _ in range(steps):
-            m = (a + b) / 2
-            ok = leaf_hole(x0 + m * dx, m * dy, R, rb, Lb, w if keel else -np.inf) < 0
-            a, b = np.where(ok, m, a), np.where(ok, b, m)
-        return (a + b) / 2
-
-    # the right half; the left one is its mirror image
-    yt = bisect(w, 0.0, 1.0, False)                        # keel corners, (g, L, 1)
-    yb = -bisect(w, 0.0, -1.0, False)
-    cx = (w + R) / 2                                       # ray origin, on the widest line
-    a0 = np.arctan2(yt, w - cx)                            # top corner: up and left, in (90, 180) deg
-    a1 = np.arctan2(yb, w - cx)                            # bottom corner: down and left, in (-180, -90)
-    # clockwise round the right side: a fine pass, then `arc` angles evenly spaced along it
-    fine = a0 + (a1 - a0) * np.linspace(0, 1, 4 * arc + 1)
-    d = bisect(cx, np.cos(fine), np.sin(fine), True, steps=16)
-    px, py = cx + d * np.cos(fine), d * np.sin(fine)
-    along = np.concatenate([np.zeros(d.shape[:-1] + (1,)),
-                            np.cumsum(np.hypot(np.diff(px, axis=-1), np.diff(py, axis=-1)), -1)], -1)
-    want = along[..., -1:] * np.arange(1, arc + 1) / (arc + 1)
-    k = np.clip((along[..., None, :] <= want[..., None]).sum(-1) - 1, 0, 4 * arc - 1)
-    at = lambda a: np.take_along_axis(a, k, -1)
-    t = (want - at(along)) / at(np.diff(along, axis=-1).clip(1e-12))
-    ang = at(fine) + t * at(np.diff(fine, axis=-1))
-    dx, dy = np.cos(ang), np.sin(ang)
-    d = bisect(cx, dx, dy, True)
-    up_keel = yb + (yt - yb) * np.arange(keel) / keel      # bottom corner and up the keel (the sway bends it)
-    x = np.concatenate([np.broadcast_to(w, yt.shape), cx + d * dx, np.broadcast_to(w, up_keel.shape)], -1)
-    y = np.concatenate([yt, d * dy, up_keel], -1)          # (g, L, arc + keel + 1)
-    off = np.mod(J, 2) * p / 2
-    Sc = (off + (I + 0.5) * p)[:, None, None]
-    Zc = ((J + 0.5) * h)[:, None, None]
-    out = []
-    for sign in (1, -1):
-        Sw = Sc + sign * x
-        Zp = Zc + y
-        Z = Zp - shift[None, :, None]
-        S = Sw.copy()
-        for _ in range(60):                                # S + sway(S, Z) = Sw
-            S = Sw - c.warp * np.sin(2 * np.pi * Z / LEAF_WAVE + _leaf_turns(pot) * S / pot.r0)
-        err = np.abs(_leaf_warp(pot, c, S, Z) - Sw).max()
-        if err > 1e-6:
-            raise RuntimeError(f"leaves sway inversion did not converge ({err:.2g} mm)")
-        out.append(np.stack([S, Z], -1))
-    out = np.concatenate(out)
-    z = out[..., 1]
-    return out[(z.max((1, 2)) > lo) & (z.min((1, 2)) < hi)]
-
-
 def pat_spiral(pot, P, th, Z, r, s):
     """Slots along a many-start helix, staggered between neighbouring
     helices. Slot ends are cut level (a short flat bridge). The helix count
@@ -803,9 +634,7 @@ def isogrid_cutters(pot, c, depths):
 # A tiling is the kind of every t0 (it fixes every t1 too). Going once
 # around the pot is N columns, and (i + N, j - N/2) is the same point
 # (N even), so tilings are stored for i in [0, N) and rows j0 .. j0 + J.
-# A hole is one lozenge or several of one kind (an L of three on blocks),
-# drawn as up to two overlapping parallelograms; a strut runs only round
-# the outside of each hole.
+# Every lozenge is a hole, with a strut round it.
 LOZ_V, LOZ_A, LOZ_B = 0, 1, 2
 LOZ_EDGES = {LOZ_V: ((1, 0), (-1, 1)), LOZ_A: ((1, 0), (0, 1)), LOZ_B: ((1, -1), (0, 1))}
 LOZ_PARTNER = {LOZ_V: (-1, 0), LOZ_A: (0, 0), LOZ_B: (0, -1)}     # its t1, from (i, j)
@@ -813,8 +642,8 @@ LOZ_PARTNER = {LOZ_V: (-1, 0), LOZ_A: (0, 0), LOZ_B: (0, -1)}     # its t1, from
 
 class Lozenges(NamedTuple):
     """A periodic hole layout on the lattice: N columns, side a, rows from j0;
-    t0, t1: (N, J) hole index of each triangle; pieces: (H, 2, 3, 2) per hole
-    two parallelograms as (centre, half edge A, half edge B) in (S, Z) mm."""
+    t0, t1: (N, J) hole index of each triangle; pieces: (H, 3, 2) per hole
+    its parallelogram as (centre, half edge A, half edge B) in (S, Z) mm."""
     N: int
     a: float
     j0: int
@@ -841,51 +670,23 @@ def _loz_rows(pot, N, a, margin):
     return j0, int(np.ceil(hi / a)) + 2 - j0
 
 
-def _loz_layout(N, a, j0, kind, groups=None):
-    """Lozenges from the kind of every t0 (N, J); `groups` (N, J) optionally
-    gives each t0 a group label (holes of several lozenges of one kind: up to
-    an L of three), else every lozenge is its own hole."""
+def _loz_layout(N, a, j0, kind):
+    """Lozenges from the kind of every t0 (N, J), every lozenge its own hole."""
     J = kind.shape[1]
     e1, e2 = _loz_basis(a)
     I, Jr = np.meshgrid(np.arange(N), np.arange(J), indexing="ij")
     j = Jr + j0
-    t0 = np.full((N, J), -1)
+    t0 = I * J + Jr
     t1 = np.full((N, J), -1)
-    key = groups if groups is not None else I * J + Jr
-    labels, hole = np.unique(key.ravel(), return_inverse=True)
-    t0[:] = hole.reshape(N, J)
     for k, (di, dj) in LOZ_PARTNER.items():
         m = kind == k
         ii, jj, ok = _loz_wrap(N, j0, J, I[m] + di, j[m] + dj)
         t1[ii[ok], jj[ok]] = t0[m][ok]
-    # pieces: per hole, its lozenges (corner + edge vectors), merged into arms
-    pieces = np.zeros((len(labels), 2, 3, 2))
-    members = [[] for _ in labels]
-    for (i, jr), h in np.ndenumerate(t0):
-        members[h].append((i, jr + j0, kind[i, jr]))
-    for h, mem in enumerate(members):
-        k = mem[0][2]
-        E1, E2 = (u[0] * e1 + u[1] * e2 for u in LOZ_EDGES[k])
-        # lozenge centres, unwrapped next to the first one
-        P = np.array([[i, j] for i, j, _ in mem], float)
-        turn = np.round((P[0, 0] - P[:, 0]) / N)                # (i + N, j - N/2) is the same cell
-        P += turn[:, None] * [N, -(N // 2)]
-        C = P[:, :1] * e1 + P[:, 1:] * e2 + (E1 + E2) / 2
-        if len(mem) == 1:
-            pieces[h] = [C[0], E1 / 2, E2 / 2]
-            continue
-        # an L: the corner lozenge touches both others; each arm is the corner plus one
-        d = C[:, None] - C[None]
-        dist = np.hypot(d[..., 0], d[..., 1])
-        side = np.isclose(dist, np.hypot(*E1)) | np.isclose(dist, np.hypot(*E2))
-        corner = int(np.argmax(side.sum(1)))
-        others = [m for m in range(len(mem)) if m != corner]
-        if len(mem) > 3 or len(others) != side[corner].sum():
-            raise ValueError("a hole must be one lozenge or an L of up to three")
-        for p, m in enumerate((others * 2)[:2]):
-            along1 = abs(np.dot(C[m] - C[corner], E1)) > abs(np.dot(C[m] - C[corner], E2))
-            pieces[h, p] = [(C[m] + C[corner]) / 2, E1 if along1 else E1 / 2, E2 / 2 if along1 else E2]
-    return Lozenges(N, a, j0, t0, t1, pieces)
+    # pieces: per hole, its centre and half edges
+    E = np.array([[u[0] * e1 + u[1] * e2 for u in LOZ_EDGES[k]] for k in (LOZ_V, LOZ_A, LOZ_B)])
+    E1, E2 = E[kind.ravel(), 0], E[kind.ravel(), 1]
+    C = I.ravel()[:, None] * e1 + j.ravel()[:, None] * e2 + (E1 + E2) / 2
+    return Lozenges(N, a, j0, t0, t1, np.stack([C, E1 / 2, E2 / 2], 1))
 
 
 def _normal(v):
@@ -911,82 +712,33 @@ def loz_hole(pot, L, S, ZZ, strut):
     jj = np.clip(jj, 0, J - 1)
     h = np.where(upper, L.t1[ii, jj], L.t0[ii, jj])
     ok &= h >= 0
-    pc = L.pieces[np.where(ok, h, 0)]                        # (n, 2, 3, 2)
-    q = np.stack([S, ZZ], -1)[:, None] - pc[:, :, 0]
+    pc = L.pieces[np.where(ok, h, 0)]                        # (n, 3, 2)
+    q = np.stack([S, ZZ], -1) - pc[:, 0]
     q[..., 0] = np.mod(q[..., 0] + pot.circ / 2, pot.circ) - pot.circ / 2
-    f = _para_hole(q, pc[:, :, 1], pc[:, :, 2], np.asarray(strut)[..., None]).min(1)
+    f = _para_hole(q, pc[:, 1], pc[:, 2], strut)
     return np.where(ok, f, 1.0)
 
 
-def _loz_frames(pieces):
-    """Per hole: the centre of its corner lozenge, its half edges E1/2, E2/2
-    and the sides its legs go to along them (s1, s2: +-1, or 0 for a single
-    lozenge), from the two pieces of each hole (see _loz_layout)."""
-    (C1, A1, B1), (C2, A2, B2) = pieces[:, 0].transpose(1, 0, 2), pieces[:, 1].transpose(1, 0, 2)
-    norm = lambda v: np.hypot(v[:, 0], v[:, 1])
-    first = norm(A1) > 1.5 * norm(A2)                            # piece 0 is the arm along E1
-    Ca, Cb = np.where(first[:, None], C1, C2), np.where(first[:, None], C2, C1)
-    Ea = np.where(first[:, None], A2, A1)                        # E1 / 2: the shorter A
-    Eb = np.where(first[:, None], B1, B2)                        # E2 / 2: the shorter B
-    single = np.all(np.isclose(pieces[:, 0], pieces[:, 1]), axis=(1, 2))
-    Ea, Eb = np.where(single[:, None], A1, Ea), np.where(single[:, None], B1, Eb)
-    # Ca = corner + s1 Ea, Cb = corner + s2 Eb
-    s = np.linalg.solve(np.stack([Ea, -Eb], -1), (Ca - Cb)[..., None])[..., 0]
-    s = np.where(single[:, None], 0, np.round(s))
-    corner = np.where(single[:, None], C1, Ca - s[:, :1] * Ea)
-    return corner, Ea, Eb, s[:, 0], s[:, 1]
-
-
-def _l_outline(da, db, extra=7):
-    """An L of three unit lozenges in the (alpha, beta) frame of its corner
-    lozenge [-1, 1]^2, legs toward +alpha and +beta, shrunk by da, db; with
-    `extra` - 1 points along each outer side of the corner lozenge, so the
-    mean of the points (where solid.py centres the cap fans) lies in the
-    corner lozenge, which sees the whole L. da, db: (L,) -> (L, 6 + 2 extra, 2)."""
-    a0, a1, a3 = -1 + da, 1 - da, 3 - da
-    b0, b1, b3 = -1 + db, 1 - db, 3 - db
-    t = np.arange(1, extra) / extra
-    one = np.ones_like(da)
-    pts = [np.stack([a0, b0], -1)]
-    pts += [np.stack([a0 + (a1 - a0) * k, b0], -1) for k in t]               # along the bottom
-    pts += [np.stack(p, -1) for p in ((a3, b0), (a3, b1), (a1, b1), (a1, b3), (a0, b3), (a0, b1 * one))]
-    pts += [np.stack([a0, b1 + (b0 - b1) * k], -1) for k in t]               # down the left side
-    return np.stack(pts, -2)
-
-
 def loz_cutters(pot, c, depths, L):
-    """The lozenge holes for solid.py: (n, len(depths), 4, 2) parallelograms
-    for single lozenges and (n, len(depths), 20, 2) outlines for Ls (see
-    _l_outline), each shrunk by half a strut on every side and moved down
-    like the field. None if a hole closes up."""
+    """The lozenge holes for solid.py: (n, len(depths), 4, 2) parallelograms,
+    each shrunk by half a strut on every side and moved down like the field.
+    None if a hole closes up."""
     lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
     strut = np.array([taper(c, s) for s in depths])
     shift = np.array([taper_shift(c, s, np.sqrt(3) / 2) for s in depths])
-    corner, Ea, Eb, s1, s2 = _loz_frames(L.pieces)
+    C, Ea, Eb = L.pieces.transpose(1, 0, 2)
     na, nb = _normal(Ea), _normal(Eb)
     da = strut[None] / 2 / np.abs((nb * Ea).sum(-1))[:, None]   # (n, L): half a strut in units of Ea
     db = strut[None] / 2 / np.abs((na * Eb).sum(-1))[:, None]
     if (da > 0.99).any() or (db > 0.99).any():
         return None
-    corner = corner + (np.mod(corner[:, :1] + pot.circ / 2, pot.circ) - pot.circ / 2 - corner[:, :1]) * [1, 0]
-    out = []
-    single = s1 == 0
-    for group in (single, ~single):
-        if not group.any():
-            continue
-        if group is single:
-            sq = np.array([(1, 1), (-1, 1), (-1, -1), (1, -1)])
-            ab = sq[None, None] * np.stack([1 - da[group], 1 - db[group]], -1)[:, :, None]
-            sa, sb = np.ones(group.sum()), np.ones(group.sum())
-        else:
-            ab = np.stack([_l_outline(da[k], db[k]) for k in np.flatnonzero(group)])
-            sa, sb = s1[group], s2[group]
-        o = (corner[group, None, None] + (ab[..., :1] * sa[:, None, None, None]) * Ea[group, None, None]
-             + (ab[..., 1:] * sb[:, None, None, None]) * Eb[group, None, None])
-        o[..., 1] -= shift[None, :, None]
-        z = o[..., 1]
-        out.append(o[(z.max((1, 2)) > lo) & (z.min((1, 2)) < hi)])
-    return out
+    C = C + (np.mod(C[:, :1] + pot.circ / 2, pot.circ) - pot.circ / 2 - C[:, :1]) * [1, 0]
+    sq = np.array([(1, 1), (-1, 1), (-1, -1), (1, -1)])
+    ab = sq[None, None] * np.stack([1 - da, 1 - db], -1)[:, :, None]       # (n, L, 4, 2)
+    o = C[:, None, None] + ab[..., :1] * Ea[:, None, None] + ab[..., 1:] * Eb[:, None, None]
+    o[..., 1] -= shift[None, :, None]
+    z = o[..., 1]
+    return o[(z.max((1, 2)) > lo) & (z.min((1, 2)) < hi)]
 
 
 @lru_cache(maxsize=16)
@@ -1012,20 +764,11 @@ def _voxel(pot, c):
     return _loz_cached(N, a, j0, J, "voxel", int(c.sweeps), int(c.seed))
 
 
-def _blocks(pot, c):
-    N = 6 * pot.count(c.cells / 2)                # a repeat is six columns and holds two blocks
-    a = pot.circ / (N * np.sqrt(3) / 2)
-    j0, J = _loz_rows(pot, N, a, 6 * a + 5)
-    return _loz_cached(N, a, j0, J, "blocks")
-
-
 @lru_cache(maxsize=16)
 def _loz_cached(N, a, j0, J, name, sweeps=0, seed=0):
     if name == "cubes":
         return _loz_layout(N, a, j0, _cubes_layout(N, j0, J))
-    if name == "voxel":
-        return _loz_layout(N, a, j0, _voxel_layout(N, j0, J, sweeps, seed))
-    return _loz_layout(N, a, j0, *_blocks_layout(N, j0, J))
+    return _loz_layout(N, a, j0, _voxel_layout(N, j0, J, sweeps, seed))
 
 
 def _voxel_layout(N, j0, J, sweeps, seed):
@@ -1055,34 +798,6 @@ def _voxel_layout(N, j0, J, sweeps, seed):
     return kind
 
 
-# blocks: a cube of side 2 lattice units with its top-back, bottom-left and
-# bottom-right eighths cut away; its three faces are Ls of three lozenges
-# (offsets from the block's point C, which sits on every (3m, 3n)).
-BLOCK_FACES = {LOZ_V: ((0, 0), (1, 0), (-1, 1)),       # top face, a V
-               LOZ_B: ((-1, -1), (-2, 1), (-1, 0)),    # left face, leg down on its right
-               LOZ_A: ((0, -2), (0, -1), (1, -1))}     # right face, leg down on its left
-
-
-def _blocks_layout(N, j0, J):
-    """The notched blocks: kind and group label of every t0."""
-    kind = np.full((N, J), -1)
-    group = np.full((N, J), -1)
-    I, Jr = np.meshgrid(np.arange(N), np.arange(J) + j0, indexing="ij")
-    C = (np.mod(I, 3) == 0) & (np.mod(Jr, 3) == 0)
-    for f, (k, offs) in enumerate(BLOCK_FACES.items()):
-        for di, dj in offs:
-            ii, jj, ok = _loz_wrap(N, j0, J, I[C] + di, Jr[C] + dj)
-            kind[ii[ok], jj[ok]] = k
-            gi, gj, _ = _loz_wrap(N, j0, J, I[C], Jr[C])         # label: the block's own cell and face
-            group[ii[ok], jj[ok]] = (gi * J + gj)[ok] * 3 + f
-    # cells whose block lies beyond the rows: plain lozenges of the cube tiling
-    # (they are outside the pattern band, the clip cuts them off)
-    rest = kind < 0
-    kind[rest] = _cubes_layout(N, j0, J)[rest]
-    group[rest] = -1 - np.arange(rest.sum())
-    return kind, group
-
-
 def _loz_pattern(layout, name):
     def fn(pot, P, th, Z, r, s):
         c = getattr(P, name)
@@ -1096,131 +811,6 @@ def _loz_pattern(layout, name):
 
 pat_cubes, cubes_cutters = _loz_pattern(_cubes, "cubes")
 pat_voxel, voxel_cutters = _loz_pattern(_voxel, "voxel")
-pat_blocks, blocks_cutters = _loz_pattern(_blocks, "blocks")
-
-
-# ---------------------------------------------------------------- romanesco
-GOLDEN = np.pi * (3 - np.sqrt(5))       # golden angle: the florets' spiral
-ROOF = np.cos(SLOPE)                    # flat roof of the round holes, at this x R above the centre
-
-
-@lru_cache(maxsize=8)
-def _florets(circ, height, n, row, spacing, small, gap, seed):
-    """Seeds (S, Z) of the romanesco holes, the soil-side radius of each
-    one's round cap, and a KD-tree on the seeds (periodic around the pot).
-    Florets sit on a staggered grid, n around; each is a golden-angle (Vogel)
-    spiral of seeds `spacing` mm apart on average, turned at random and
-    mirrored on every other floret, keeping only the seeds nearer its own
-    centre than any other floret's. Where two florets meet, seeds closer
-    than `gap` are thinned out (the one nearer its floret's edge goes), so
-    every hole opens on the soil side. The cap radius is g spacing / 2, with
-    g from `small` at the floret's centre to 1 at its edge."""
-    from scipy.spatial import cKDTree
-    w = circ / n
-    h = w * row
-    rng = np.random.default_rng(seed)
-    rows = np.arange(-2, int(height / h) + 3)
-    J, I = [a.ravel() for a in np.meshgrid(rows, np.arange(n), indexing="ij")]
-    cs = np.mod((I + 0.5 + 0.5 * np.mod(J, 2)) * w, circ)
-    cz = (J + 0.5) * h
-    c = spacing * np.sqrt(np.sqrt(3) / (2 * np.pi))       # Vogel's scale for that mean spacing
-    k = np.arange(int((0.9 * w / c) ** 2) + 1)
-    rho, phi = c * np.sqrt(k + 0.5), k * GOLDEN
-    ang = np.where(np.mod(I + J, 2), 1, -1)[:, None] * phi + rng.uniform(0, 2 * np.pi, len(cs))[:, None]
-    S = np.mod(cs[:, None] + rho * np.cos(ang), circ).ravel()
-    Zs = (cz[:, None] + rho * np.sin(ang)).ravel()
-    box, up = [circ, 1e6], 1e5                            # Z moved up: the tree's box starts at 0
-    _, near = cKDTree(np.c_[cs, cz + up], boxsize=box).query(np.c_[S, Zs + up])
-    keep = near == np.repeat(np.arange(len(cs)), len(k))
-    pts = np.c_[S[keep], Zs[keep] + up]
-    u = np.clip(np.tile(rho, len(cs))[keep] / (0.5 * w), 0, 1)
-    while True:
-        pairs = cKDTree(pts, boxsize=box).query_pairs(gap, output_type="ndarray")
-        if not len(pairs):
-            break
-        drop = np.unique(np.where(u[pairs[:, 0]] >= u[pairs[:, 1]], pairs[:, 0], pairs[:, 1]))
-        pts, u = np.delete(pts, drop, 0), np.delete(u, drop)
-    return pts - [0, up], (small + (1 - small) * u) * spacing / 2, cKDTree(pts, boxsize=box)
-
-
-def _romanesco(pot, c):
-    return _florets(pot.circ, pot.height, pot.count(c.cells), c.row, c.spacing, c.small, c.strut_in + 1.0, c.seed)
-
-
-def round_hole(px, pz, R):
-    """A round hole with a flat roof where the circle's slope drops below SLOPE."""
-    return np.maximum(np.hypot(px, pz) - R, pz - R * ROOF)
-
-
-def pat_romanesco(pot, P, th, Z, r, s):
-    """Romanesco florets: holes on golden-angle spirals, small and round at
-    each floret's centre (the tip of the cone), growing toward its edge
-    into the cells of the spiral's Voronoi diagram; florets on a staggered
-    grid, turned at random and alternately mirrored. Each hole is its
-    seed's Voronoi cell (struts at least `strut` wide, as on voronoi) cut
-    to a round cap, which has a flat roof where the circle gets flatter
-    than SLOPE. Tapered like voronoi: struts thin from strut_in to
-    strut_out through the wall, the caps grow by as much, and the pattern
-    moves down to keep the roofs level (unless `center`)."""
-    c = P.romanesco
-    pts, R, tree = _romanesco(pot, c)
-    S, ZZ = unroll(pot, th, Z)
-    ZZ = ZZ + taper_shift(c, s, 1.0)
-    strut = taper(c, s)
-    d, idx = tree.query(np.c_[np.mod(S, pot.circ), ZZ + 1e5], k=2)
-    i = idx[:, 0]
-    px = np.mod(S - pts[i, 0] + pot.circ / 2, pot.circ) - pot.circ / 2
-    cap = round_hole(px, ZZ - pts[i, 1], R[i] + (c.strut_in - strut) / 2)
-    return np.maximum(strut / 2 - (d[:, 1] - d[:, 0]) / 2, cap)
-
-
-def _by_turning(P, m):
-    """Indices (n, m) of m of the points of closed outlines P (n, L, k, 2) to
-    keep, the same at every depth: spread by the outline's turning (summed
-    over the depths) half and evenly half, so the corners keep a point each
-    and no stretch goes without."""
-    a = np.roll(P, -1, 2) - P
-    ang = np.arctan2(a[..., 1], a[..., 0])
-    turn = np.abs(np.mod(ang - np.roll(ang, 1, 2) + np.pi, 2 * np.pi) - np.pi).sum(1)    # (n, k) at each point
-    k = P.shape[2]
-    w = 0.5 * turn / turn.sum(1, keepdims=True) + 0.5 / k
-    cum = np.cumsum(w, 1)
-    idx = np.stack([np.searchsorted(cw, (np.arange(m) + 0.5) / m) for cw in cum])
-    idx = np.maximum.accumulate(idx - np.arange(m), 1) + np.arange(m)     # strictly increasing
-    return np.minimum(idx, k - m + np.arange(m))
-
-
-def romanesco_cutters(pot, c, depths, arc=28, fine=240, near=12):
-    """The romanesco holes for solid.py: (n, len(depths), arc, 2) outlines in
-    the unrolled (S, Z) plane. At `fine` angles round each seed the edge is
-    the nearer of the Voronoi hole's (_vor_reach, from the `near` nearest
-    seeds) and the round cap with its flat roof; of those, the `arc` that
-    follow it best at every depth (_by_turning: the corners and evenly
-    round the rest)."""
-    pts, R, tree = _romanesco(pot, c)
-    lo, hi = pot.base + PATTERN_GAP, pot.height - pot.rim
-    depths = np.asarray(depths)
-    strut = np.array([taper(c, s) for s in depths])
-    shift = np.array([taper_shift(c, s, 1.0) for s in depths])
-    reach = R.max() + c.strut_in
-    sel = np.flatnonzero((pts[:, 1] + reach - shift.min() > lo) & (pts[:, 1] - reach - shift.max() < hi))
-    _, nb = tree.query(pts[sel] + [0, 1e5], k=near + 1)
-    D = pts[nb[:, 1:]] - pts[sel, None]                          # (n, j, 2) offsets to the neighbours
-    D[..., 0] = np.mod(D[..., 0] + pot.circ / 2, pot.circ) - pot.circ / 2
-    phi = np.linspace(0, 2 * np.pi, fine, endpoint=False)
-    U = np.c_[np.cos(phi), np.sin(phi)]
-    t = np.stack([_vor_reach(D[:, None], st, np.broadcast_to(U, (len(sel), fine, 2))) for st in strut], 1)
-    Rc = R[sel, None] + (c.strut_in - strut[None]) / 2           # (n, L) cap radius
-    roof = np.where(U[:, 1] > 1e-9, ROOF / np.where(U[:, 1] > 1e-9, U[:, 1], 1), np.inf)
-    t = np.minimum(t, Rc[..., None] * np.minimum(1, roof))       # (n, L, fine)
-    if (t.min(-1) < 0.02).any():
-        return None
-    P = t[..., None] * U                                         # around each seed
-    P = np.take_along_axis(P, _by_turning(P, arc)[:, None, :, None], 2)
-    S = np.mod(pts[sel, 0] + pot.circ / 2, pot.circ) - pot.circ / 2
-    P[..., 0] += S[:, None, None]
-    P[..., 1] += pts[sel, 1, None, None] - shift[None, :, None]
-    return P
 
 
 def pat_chevrons(pot, P, th, Z, r, s):
@@ -1271,12 +861,6 @@ PATTERNS = {
     "cubes": Pattern("2d", pat_cubes, "tumbling blocks: isometric cubes of three rhombi, flaring outward",
                      cutters=cubes_cutters),
     "voxel": Pattern("2d", pat_voxel, "random stacked isometric cubes, flaring outward", cutters=voxel_cutters),
-    "blocks": Pattern("2d", pat_blocks, "notched isometric blocks, faces in L shapes, flaring outward",
-                      cutters=blocks_cutters),
-    "romanesco": Pattern("2d", pat_romanesco, "romanesco florets: round holes on golden spirals, flaring outward",
-                         cutters=romanesco_cutters),
-    "leaves": Pattern("2d", pat_leaves, "echeveria leaves with a keel, staggered and swaying, flaring outward",
-                      cutters=leaves_cutters),
     "louvers": Pattern("2d", pat_louvers, "gills sloping down and out, no line of sight"),
     "slots": Pattern("2d", pat_slots, "narrow wavy vertical slots, air-pruning style"),
     "spiral": Pattern("2d", pat_spiral, "slots on a many-start helix"),

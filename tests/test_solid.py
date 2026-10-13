@@ -25,8 +25,8 @@ def field_hole_volume(pot, name, n=300_000, params=None):
 
 
 def test_tapered_patterns_use_the_solid_builder():
-    assert set(SOLID) == {"voronoi", "hex", "drops", "lattice", "isogrid", "leaves",
-                          "cubes", "voxel", "blocks", "romanesco"}
+    assert set(SOLID) == {"voronoi", "hex", "drops", "lattice", "isogrid",
+                          "cubes", "voxel"}
 
 
 @pytest.mark.parametrize("name", SOLID)

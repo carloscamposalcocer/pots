@@ -58,7 +58,7 @@ def test_pattern_has_no_loose_parts(name, caplog):
     assert mesh.is_watertight and mesh.body_count == 1
     # hex: its pointy roofs are 30-degree slopes (short near-bridges), ~13% here;
     # the cube patterns have the same roofs over every rhombus, ~19% here
-    limit = {"hex": 0.15, "cubes": 0.20, "voxel": 0.20, "blocks": 0.20}
+    limit = {"hex": 0.15, "cubes": 0.20, "voxel": 0.20}
     assert overhang_share(mesh) < limit.get(name, 0.12)
 
 
