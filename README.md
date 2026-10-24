@@ -40,7 +40,7 @@ pots quality=full                     # print-quality mesh, use this for the fil
 pots size=small                       # the 50 mm pot
 pots size=small height=65             # start from a preset, change one value
 pots pattern=hex design.wall=4        # another pattern, thinner wall
-pots clips.enable=true                # add the two wall-mount pads
+pots clips.enable=true                # wall mount: pads + a rail for the wall
 pots height=65 --show                 # print the final settings, don't build
 pots --all                            # every pattern, one after another
 pots -v                               # debug logging
@@ -71,7 +71,7 @@ Written to `out` (default `output/<pattern>_<shape>_h<height>/`):
 | `shape` | `tapered` | Pot profile, see [Pot shapes](#pot-shapes). |
 | `size` | `big` | Size preset: `big` or `small`, see [Size presets](#size-presets-srcpotsconfigsize). |
 | `height` | from `size` | Pot height in mm. **Drives the whole shape**, see [Scaling](#scaling-with-height). Minimum `base + rim + 10` (17.4 mm). |
-| `clips.enable` | `false` | Add the two wall-mount pads, see [Wall mount](#wall-mount-clips). |
+| `clips.enable` | `false` | Add the wall mount (pads on the pot + a rail to screw to the wall), see [Wall mount](#wall-mount-clips). |
 | `preview` | `true` | Also render the PNG preview (~20 s). |
 | `out` | `output/${pattern}_${shape}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `draft` | Mesh quality preset: `draft` (fast check) or `full` (for printing). |
@@ -118,58 +118,73 @@ pot size, so they **do not scale** with `height`.
 
 ### Wall mount (`clips.*`)
 
-`clips.enable=true` adds two small pads to the back of the pot, one on the
-cup and one at the top, each with a T-slot. The pot then hangs on a pair of
-screws and lifts straight off again.
+`clips.enable=true` turns the pot into a wall-hung one. It is printed as two
+parts:
+
+- **a rail** that stays screwed to the wall: a flat strip with two keys
+  standing out of it, one for the cup and one for the top of the pot. Each
+  key is a 45° dovetail. It is exported beside the pot as
+  `<name>_rail.stl` / `.3mf`, already lying in its print orientation (wall
+  face on the bed, keys up, the long key at the top), and takes about 10
+  minutes and 3 g to print.
+- **two small pads** on the back of the pot with the matching sockets, open
+  at the bottom.
 
 ```sh
 pots clips.enable=true                       # defaults: 4 mm screws, 9 x 3 mm heads
-pots clips.enable=true clips.head=8 clips.travel=10
+pots clips.enable=true clips.grip=3          # a deeper dovetail
 pots clips.enable=true clips.at=0            # pads on the front, for the preview
 ```
 
 To hang it:
 
 1. Build the pot and read the line the build prints, for example
-   `clips: two screws (shank 4 mm, head up to 9 x 3 mm) 81.3 mm apart
-   vertically, standing 5.0-5.6 mm off the wall; the pot slides down 7.0 mm
-   onto them`.
-2. Drive two screws into the wall, one above the other, exactly that far
-   apart, and leave their heads standing that far proud.
-3. Hold the pot with both heads at the open bottoms of the two slots, push
-   it flat against the wall and slide it down. The upper slot ends in a flat
-   seat that the screw rests on; that is what carries the pot. The lower
-   slot runs right through its pad, so it only keeps the bottom against the
-   wall and stops it swinging - a few mm of drilling error just leaves the
-   lower screw a little higher or lower in its slot.
+   `clips: a 13 x 91 x 5.2 mm rail on the wall, held by two 4 mm screws
+   57 mm apart (heads sunk in, the lower hole a +-2 mm slot); the pot slides
+   7.0 mm down onto its keys and stands 7.0 mm off the wall`.
+2. Print both parts. Screw the rail to the wall through its two holes, keys
+   facing you, the long key at the top. Only the upper hole has to be drilled
+   accurately: the lower one is a ±2 mm slot, so hang the rail on the first
+   screw, level it, and mark the second through the slot. Both heads sink
+   flush into their counterbores, whatever shape they are, so the pot can
+   slide right over them.
+3. Hold the pot a little high against the rail, with the two keys in the
+   open bottoms of its sockets, and slide it down. The upper socket ends in
+   a 45° chisel and the upper key ends in the same plane: that face carries
+   the pot, and because it slopes inward it also pulls the pot in against
+   the rail. The lower socket runs right through its pad, so it only keeps
+   the bottom in and stops the pot swinging sideways; nothing has to line up
+   there.
 4. To take the pot down, lift it straight up and off.
 
-The two pads are the only part that touches the wall (everything else keeps
-at least 1 mm of air), and the wall behind the upper pad is filled solid, so
-the mount hangs on a solid patch of pot rather than on the pattern. Their
-outside edges are broken with a 45° chamfer (`clips.chamfer`), the bottom
-back edge of the lower one with the same elephant-foot chamfer as the pot.
+The rail is the only thing that touches the wall; the pot keeps at least
+1 mm of air to it everywhere except on the two pads, which slide on its
+face. The wall behind the upper pad is filled solid, so the mount hangs on a
+solid patch of pot rather than on the pattern. The pads' outside edges are
+broken with a 45° chamfer (`clips.chamfer`), the bottom back edge of the
+lower one with the same elephant-foot chamfer as the pot.
 
 | Key | Default | Description |
 |---|---|---|
-| `clips.enable` | `false` | Add the pads. |
-| `clips.screw` | 4.0 | Screw shank diameter (mm). The slot in the back face is this + `clear` wide. |
-| `clips.head` | 9.0 | Screw head diameter (mm); the recess behind the lips is this + `clear`. Measure yours: a 4 mm wall screw or a #8 is about 8-9 mm. |
-| `clips.head_h` | 3.0 | Screw head thickness (mm). |
-| `clips.clear` | 0.6 | Clearance added around the screw (mm). |
-| `clips.lip` | 2.0 | Lips that trap the head, measured from the back face (mm). The heads must stand `lip + head_h` to `lip + head_h + clear` off the wall. |
-| `clips.width` | 16.0 | Pad width around the pot (mm). Wider = stiffer mount, more plastic. |
-| `clips.chamfer` | 1.0 | 45° break on the pads' outside edges (mm): back-to-top, back-to-sides and top-to-sides. 0 leaves them sharp; it must stay clear of the slot, so at most `(width - head - clear) / 2` and at most `lip + 2`. |
+| `clips.enable` | `false` | Add the mount (pads on the pot, plus the rail as a second file). |
+| `clips.screw` | 4.0 | Shank diameter of the wall screws (mm). The rail's holes are this + `clear`. |
+| `clips.head` | 9.0 | Their head diameter (mm); the counterbore is this + `clear`. Measure yours: a 4 mm wall screw or a #8 is about 8-9 mm. |
+| `clips.head_h` | 3.0 | Their head thickness (mm). It sets the rail's thickness, `1.6 + head_h + clear`, and so how far the pot stands off the wall. |
+| `clips.clear` | 0.6 | Clearance (mm): socket to key, hole to screw. |
+| `clips.key` | 5.0 | Width of a key where it leaves the rail (mm). The socket's mouth is this + `clear`. |
+| `clips.grip` | 2.5 | How far a key stands out of the rail, and, at 45°, how far it spreads each side (mm). This is what holds the pot in: more grips harder and needs thicker pads, less is slimmer but shallower. |
+| `clips.width` | 16.0 | Pad width around the pot (mm). Wider = stiffer mount, more plastic. It has to cover the socket and hide the rail, so at least 15.4 mm with the defaults. |
+| `clips.chamfer` | 1.0 | 45° break on the pads' outside edges (mm): back-to-top, back-to-sides and top-to-sides. 0 leaves them sharp; it must stay clear of the socket, so at most `(width - key - clear) / 2` and at most `grip + clear + 2`. |
 | `clips.travel` | 7.0 | How far the pot slides down to seat (mm). Shortened automatically when the cup is too short for it (the build warns). |
 | `clips.at` | 180.0 | Where the pads sit around the pot (degrees). 180 is the back, away from the preview's front view. |
 
 Sizes are in mm and **do not scale** with `height` - screws don't. What does
-scale is the cup, which carries the lower pad: below about 46 mm of pot
+scale is the cup, which carries the lower key: below about 42 mm of pot
 height there is no room for a usable slide and `clips.enable=true` is
-refused. On a `size=small` pot the pads look chunky for the same reason;
-smaller screws shrink them (`clips.screw=3 clips.head=7 clips.head_h=2.3
-clips.width=13`), and a thinner head is what pulls the pot closest to the
-wall, since the standoff is set by how deep the slot has to be.
+refused. On a small pot the pot also ends up standing further off the wall
+(about 10 mm instead of 7 mm), because the lower pad has to stand clear of
+the cup's lip, which is then the widest part of the pot; a thinner screw head
+(`clips.head_h=2.3`) is what pulls it back in.
 
 ### Pattern settings (`patterns.<name>.*`, `src/pots/config/patterns.yaml`)
 
@@ -306,11 +321,13 @@ The generator follows these; keep them when changing the code:
   at least that thick.
 - 45° chamfer on the bottom outer edge (elephant foot).
 - Every pattern is periodic around the circumference.
-- The wall-mount pads obey the same rules: the lower one is a prism rising
-  from the build plate (no overhang at all), the upper one is a prism with a
-  45° wedge underside, and the only roofs in their slots are the seat (a
-  bridge as wide as the slot) and a 45° ramp over the head recess. Turning
-  the clips on does not change the overhang share.
+- The wall mount obeys the same rules: the lower pad is a prism rising from
+  the build plate (no overhang at all), the upper one is a prism with a 45°
+  wedge underside, and their sockets are vertical channels with no roof but
+  the upper one's 45° chisel - no bridges anywhere, so turning the clips on
+  leaves the overhang share unchanged. The rail prints flat, wall face down:
+  every layer is the same as the one below or narrower, bar the dovetail
+  flanks and the chisel, which are 45°.
 
 ## Using it from Python
 
@@ -332,7 +349,8 @@ src/pots/
   gallery.py    `pots-gallery` command: every pattern + README images
   config/       Hydra config: config.yaml and the quality/ and size/ presets
   geometry.py   Pot: all dimensions, scaled from the height
-  clips.py      Clips: the optional wall-mount pads, as field and as solid
+  clips.py      Clips: the optional wall mount - the pads (field and solid)
+                and the rail that stays on the wall
   patterns.py   wall patterns (PATTERNS registry)
   field.py      make_field(): wall + rim + base + cup as one implicit field
   sdf.py        field helper (smin)

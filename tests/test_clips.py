@@ -1,10 +1,11 @@
-"""The optional wall mount: where the pads sit, that a screw really fits all
-the way down both slots, and that the clips only touch their own side."""
+"""The optional wall mount: where the pads sit, that the rail's keys really
+fit all the way down both sockets, that the rail prints in one piece, and
+that the clips only touch their own side of the pot."""
 import numpy as np
 import pytest
 
 from pots import Pot, generate, make_field
-from pots.clips import STANDOFF, WEB, Clips
+from pots.clips import GAP, LEAD, SLOP, WEB, Clips
 from pots.geometry import SHAPES
 from pots.metrics import overhang_share
 
@@ -12,7 +13,7 @@ SIZES = [(50, 4.0), (65, 4.0), (130, 6.0)]
 
 
 def envelope(pot):
-    """Widest radius of the pot and cup: nothing but the pads may reach the wall."""
+    """Widest radius of the pot and cup: nothing but the rail may reach past it."""
     z = np.linspace(0, pot.height, 601)
     return max(float(pot.r_out(z).max()), pot.cup_lip + pot.cup_wall)
 
@@ -25,42 +26,58 @@ def place(c, u, v, z):
             (u * np.cos(a) - v * np.sin(a), u * np.sin(a) + v * np.cos(a), z)]
 
 
-def screw(c, u0, u1, dia, z0, steps=9, eps=0.05):
-    """Points swept by a screw of diameter `dia` between depths u0 and u1 as the
-    pot slides down onto it: its axis runs from z0 (seated) to z0 - slide."""
-    u = np.linspace(u0 + eps, u1 - eps, 3)
-    rho = np.array([0.0, 0.5, 1.0]) * (dia / 2 - eps)
-    ang = np.linspace(0, 2 * np.pi, 12, endpoint=False)
-    z = z0 - np.linspace(0, c.slide, steps)
-    U, R, A, Z = np.meshgrid(u, rho, ang, z, indexing="ij")
-    return place(c, U, R * np.cos(A), Z + R * np.sin(A))
+def key_points(c, low, eps=0.15, n=7):
+    """A grid of points strictly inside one of the rail's keys, in the rail's
+    own frame, over the part of it that goes into a socket."""
+    lo, hi = c.low_key if low else c.high_key
+    lo, hi = lo - c.rail_lo, hi - c.rail_lo
+    if low:
+        hi -= LEAD                                   # the lead-in on its tip
+    out = []
+    for z in np.linspace(c.plate + eps, c.plate + c.grip - eps, n):
+        t = z - c.plate
+        lean = 0.0 if low else t                     # the upper key leans with its socket
+        for y in np.linspace(lo + lean + eps, hi + lean - eps, n):
+            for x in np.linspace(-(c.key / 2 + t - eps), c.key / 2 + t - eps, n):
+                out.append((x, y, z))
+    return np.array(out).T
+
+
+def seated(c, f, pts, offsets=9):
+    """The field at `pts` (rail frame) all the way down the slide: the pot
+    starts `slide` mm high, so its own z runs from z - slide to z."""
+    x, y, z = c.world(*pts)
+    return min(f(*(a.astype(np.float32) for a in (x, y, z - d))).min()
+               for d in np.linspace(0, c.slide, 13))
 
 
 @pytest.mark.parametrize("h, wall", SIZES)
 @pytest.mark.parametrize("shape", SHAPES)
 def test_pads_are_thick_enough_and_stand_clear(h, wall, shape):
-    """Both slots keep WEB of material to the pot's surface, and nothing but
-    the two pads comes near the wall."""
+    """Both sockets keep WEB of material to the pot's surface, nothing but the
+    rail comes near the wall, and the rail stays hidden behind the pot."""
     pot = Pot(height=h, wall=wall, shape=shape)
     c = Clips(pot)
-    floor = c.x_wall - c.depth                        # the deepest the slot cuts
+    floor = c.x_wall - c.depth                        # the deepest the socket cuts
     high = np.linspace(c.slot_lo, c.top_z, 400)
     assert floor - float(pot.r_out(high).max()) >= WEB - 1e-9
     low = np.linspace(0, c.low_top, 400)
     assert floor - float((pot.cup_ri(low) + pot.cup_wall).max()) >= WEB - 1e-9
     assert c.low_top < pot.cup_h                      # the lower pad stays on the cup
     assert pot.base < c.slot_lo < c.mouth < c.seat < c.top_z
-    assert c.x_wall >= envelope(pot) + STANDOFF - 1e-9
-    assert c.spacing == pytest.approx(c.high_screw - c.low_screw)
+    assert c.x_wall >= envelope(pot) + GAP - 1e-9
+    assert 0 < c.rail_lo and c.rail_hi < c.top_z      # behind the cup and the rim
+    assert c.strip <= c.width                         # and behind the pads
+    assert c.spacing == pytest.approx(c.screw_hi - c.screw_lo)
 
 
-def test_a_pot_too_short_for_the_screws_is_refused():
+def test_a_pot_too_short_for_the_mount_is_refused():
     with pytest.raises(ValueError, match="taller pot"):
         Clips(Pot(height=30, wall=4.0))
 
 
 def test_the_slide_is_clamped_to_the_cup():
-    """A short cup shortens the slide instead of running the lower pad off it."""
+    """A short cup shortens the slide instead of running the lower key off it."""
     pot = Pot(height=50, wall=4.0)
     small, big = Clips(pot), Clips(Pot(height=130))
     assert small.slide < small.travel and small.low_top < pot.cup_h
@@ -78,40 +95,64 @@ def test_bad_clip_sizes():
 
 
 @pytest.mark.parametrize("h, wall", SIZES)
-def test_a_screw_slides_down_both_slots_and_stays_trapped(h, wall):
-    """Shank and head sweep an open path from the mouth to the seat; the lips
-    stay solid beside the head, and the seat stays solid above the shank."""
+def test_a_key_slides_down_both_sockets(h, wall):
+    """Both keys sweep an open path all the way down, and the pot ends up
+    sitting on the end of the upper one."""
     pot = Pot(height=h, wall=wall, skin=1.6, skin_frac=0.67)
     c = Clips(pot)
     f = make_field(pot, "voronoi", clips=c)
-    x = c.x_wall
-    for z0 in (c.high_screw, c.low_screw):
-        assert f(*screw(c, x - c.lip, x, c.screw, z0)).min() >= 0        # shank
-        assert f(*screw(c, x - c.depth, x - c.lip, c.head, z0)).min() >= 0   # head
-        # the lips beside the head, between the slot and the recess
-        v = np.linspace(c.slot_w / 2 + 0.3, c.head_w / 2 - 0.3, 4)
-        v = np.concatenate([v, -v])
-        u = np.linspace(x - c.lip + 0.2, x - 0.2, 3)
-        zz = z0 + np.linspace(-c.slide, 0, 5)
-        assert f(*place(c, *np.meshgrid(u, v, zz, indexing="ij"))).max() < 0
-    # the seat the pot hangs from
-    u = np.linspace(x - c.lip + 0.2, x - 0.2, 3)
-    v = np.linspace(-c.screw / 2, c.screw / 2, 5)
-    z = c.seat + np.linspace(0.2, 0.8, 3)
-    assert f(*place(c, *np.meshgrid(u, v, z, indexing="ij"))).max() < 0
+    for low in (False, True):
+        assert seated(c, f, key_points(c, low)) >= 0
+    # the chisel the pot hangs from: material just past the upper key's end
+    X, Y, Z = key_points(c, False)
+    end = Y > (c.high_key[1] - c.rail_lo) - 1.0 + (Z - c.plate)
+    x, y, z = c.world(X[end], Y[end] + 1.0, Z[end])
+    assert f(*(a.astype(np.float32) for a in (x, y, z))).max() < 0
+
+
+@pytest.mark.parametrize("h, wall", SIZES)
+def test_the_rail_clears_the_pot_all_the_way_down(h, wall):
+    """Nothing on the rail but its keys and its face ever touches the pot."""
+    pot = Pot(height=h, wall=wall, skin=1.6, skin_frac=0.67)
+    c = Clips(pot)
+    f = make_field(pot, "voronoi", clips=c)
+    rail = c.rail()
+    v = np.vstack([rail.vertices, rail.triangles.mean(axis=1)])
+    assert seated(c, f, v.T) >= -0.01        # 0 where its face slides on the pads
+
+
+def test_the_rail_prints_in_one_piece():
+    """One watertight body, no overhang past 45 degrees in its print
+    orientation, and a dovetail the socket's mouth cannot let go of."""
+    c = Clips(Pot(height=100))
+    rail = c.rail()
+    assert rail.is_watertight and rail.body_count == 1
+    assert overhang_share(rail) == 0
+    size = np.ptp(rail.bounds, axis=0)
+    assert rail.bounds[0, 2] == 0                     # the wall face is on the bed
+    assert size == pytest.approx([c.strip, c.rail_len, c.plate + c.grip])
+    face = rail.vertices[rail.vertices[:, 2] > c.plate + c.grip - 1e-6]
+    assert np.ptp(face[:, 0]) == pytest.approx(c.key + 2 * c.grip)
+    assert np.ptp(face[:, 0]) > c.slot_w              # it cannot pull out
+    # the screw heads sink in flush, the upper hole round and the lower a slot
+    for z, want in ((c.screw_hi, c.sink), (c.screw_lo, c.sink + 2 * SLOP)):
+        y, v = z - c.rail_lo, rail.vertices
+        rim = v[(np.abs(v[:, 2] - c.plate) < 1e-6) & (np.abs(v[:, 1] - y) < want / 2 + 0.3)]
+        assert np.ptp(rim[:, 1]) == pytest.approx(want, abs=0.05)
+        assert np.ptp(rim[:, 0]) == pytest.approx(c.sink, abs=0.05)
 
 
 def test_the_chamfer_breaks_every_outside_edge_of_the_pads():
-    """Each of the three edge families is cut, the slot is not touched, and
-    a chamfer that would reach the slot is refused."""
+    """Each of the three edge families is cut, the socket is not touched, and
+    a chamfer that would reach the socket is refused."""
     pot = Pot(height=65, wall=4.0)
     sharp, broken = Clips(pot, chamfer=0.0), Clips(pot, chamfer=1.5)
     f0, f1 = (make_field(pot, "voronoi", clips=c) for c in (sharp, broken))
     e, half = 0.2, broken.width / 2
     for top in (broken.top_z, broken.low_top):
         u = [broken.x_wall - e] * 3
-        beside = (broken.head_w / 2 + half) / 2   # beside the slot, which is open at the top
-        v = [beside, half - e, half - e]          # back-top, back-side, all three
+        beside = (broken.floor_w / 2 + half) / 2   # beside the socket, open at the top
+        v = [beside, half - e, half - e]           # back-top, back-side, all three
         z = [top - e, top - 4, top - e]
         p = place(broken, u, v, z)
         assert f0(*p).max() < 0 and f1(*p).min() >= 0
@@ -156,5 +197,8 @@ def test_a_clipped_pot_builds_clean(shape):
 @pytest.mark.parametrize("h, wall", SIZES[:2])
 def test_every_shape_and_size_builds_with_clips(shape, h, wall):
     pot = Pot(height=h, wall=wall, shape=shape, skin=1.6, skin_frac=0.67)
-    mesh, _ = generate(pot, "voronoi", voxel=0.6, faces=200_000, clips=Clips(pot))
+    clips = Clips(pot)
+    mesh, _ = generate(pot, "voronoi", voxel=0.6, faces=200_000, clips=clips)
     assert mesh.is_watertight and mesh.body_count == 1
+    rail = clips.rail()
+    assert rail.is_watertight and rail.body_count == 1

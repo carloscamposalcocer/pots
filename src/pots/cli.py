@@ -11,7 +11,8 @@ Examples
     pots size=small height=65         # start from a preset, change one value
     pots pattern=hex                  # another pattern
     pots shape=barrel                 # another pot shape
-    pots clips.enable=true            # add the two wall-mount pads (see config.yaml)
+    pots clips.enable=true            # wall mount: pads on the pot + a rail to
+                                      # screw to the wall (see config.yaml)
     pots design.wall=4                # thinner wall (mm, does not scale)
     pots pattern=lattice patterns.lattice.strut_in=2.5
                                       # a pattern setting (config/patterns.yaml)
@@ -29,6 +30,9 @@ Outputs (in `out`, default output/<pattern>_<shape>_h<height>/):
     <pattern>_<shape>_h<height>.stl   print file
     <pattern>_<shape>_h<height>.3mf   same mesh, ~5x smaller file
     <pattern>_<shape>_h<height>.png   preview: outside view, cut-away, wall faces
+    <pattern>_<shape>_h<height>_rail.stl / .3mf
+                           with clips.enable: the wall rail, a separate part,
+                           already lying in its print orientation
     config.yaml            the exact settings used
 """
 import logging
@@ -161,6 +165,15 @@ def run(cfg):
     log.info("[2/3] exporting %s.stl and %s.3mf", base, base)
     m.export(base.with_suffix(".stl")); m.export(base.with_suffix(".3mf"))
     outs = [base.with_suffix(".stl"), base.with_suffix(".3mf")]
+    if clips is not None:
+        rail = clips.rail()
+        log.info("rail  faces=%s  watertight=%s  bodies=%d  size=%.1f x %.1f x %.1f mm  "
+                 "volume=%.1f cm3", f"{len(rail.faces):,}", rail.is_watertight,
+                 rail.body_count, *np.ptp(rail.bounds, axis=0), rail.volume / 1000)
+        for suffix in (".stl", ".3mf"):
+            path = out / f"{name}_rail{suffix}"
+            rail.export(path)
+            outs.append(path)
     if cfg.preview:
         log.info("[3/3] rendering preview")
         render(m, field, pot, base.with_suffix(".png"), f"{cfg.pattern}, {cfg.shape}  (H {pot.height:g} mm)")

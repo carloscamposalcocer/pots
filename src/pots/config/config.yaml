@@ -109,51 +109,64 @@ design:
   skin_frac: 0.67
 
 # ---------------------------------------------------------------------
-# clips: optional wall mount. Two small pads on the back of the pot, one
-# on the cup and one at the top, each with a T-slot. Drive two screws
-# into the wall, one above the other, `spacing` apart (the build log
-# prints the number) and leave their heads standing off the wall; then
-# hold the pot with both heads at the open bottoms of the slots, push it
-# flat and slide it down. The upper slot ends in a flat seat that carries
-# the pot; the lower slot runs right through, so it only keeps the bottom
-# against the wall and a few mm of drilling error cost nothing. Lift the
-# pot straight up to take it off again.
+# clips: optional wall mount, printed as two parts.
 #
-# The pads are the only part that touches the wall. Every size is in mm
+#   * a flat rail that stays screwed to the wall: a strip with two keys
+#     standing out of it, one for the cup and one for the top of the pot.
+#     Each key is a 45 degree dovetail. It is exported beside the pot as
+#     <name>_rail.stl, already lying in its print orientation (wall face
+#     on the bed, keys up, the long key at the top).
+#   * two small pads on the back of the pot with the matching sockets.
+#
+# Screw the rail to the wall through its two holes, `spacing` apart (the
+# build log prints the number); the lower hole is a slot, so only the
+# first one has to be drilled accurately, and both heads sink flush into
+# the rail. Then hold the pot a little high against the rail, with the
+# keys in the open bottoms of its sockets, and slide it down. The upper
+# socket ends in a 45 degree chisel that carries the pot and pulls it in
+# against the rail; the lower socket runs right through, so it only keeps
+# the bottom in and stops the pot swinging sideways. Lift the pot
+# straight up to take it off again.
+#
+# The rail is the only part that touches the wall. Every size is in mm
 # and none of them scale with the pot (screws don't); only how far the
 # pot slides is limited by the height of the cup, which does scale, so
-# clips need a pot of about 46 mm or taller (the log says if the slide
+# clips need a pot of about 42 mm or taller (the log says if the slide
 # had to be shortened).
 # ---------------------------------------------------------------------
 clips:
-  # enable: add the two pads. Off by default (a plain pot to stand up).
+  # enable: add the mount. Off by default (a plain pot to stand up).
   enable: false
 
-  # Screw shank diameter (mm): the slot in the back face is this plus
-  # `clear` wide, and the pot hangs on the shank of the upper screw.
+  # The wall screws you will use: shank diameter, head diameter and head
+  # thickness (mm). The head must be wider than the shank. The rail's
+  # holes are `screw` + `clear` wide, with a counterbore `head` + `clear`
+  # wide and `head_h` + `clear` deep, so any head shape ends up flush and
+  # the pot can slide over it. Measure what you have (a 4 mm wall screw
+  # or a #8 is about 8-9 x 3 mm); the rail's thickness follows from them.
   screw: 4.0
-
-  # Screw head: diameter and thickness (mm). Must be wider than the
-  # shank; the recess behind the lips is this plus `clear`. Measure the
-  # screws you have (a 4 mm wall screw or a #8 is about 8-9 x 3 mm).
   head: 9.0
   head_h: 3.0
 
-  # Clearance around the screw (mm): added to every slot size.
+  # Clearance (mm): socket to key, hole to screw.
   clear: 0.6
 
-  # Lips (mm): the material between the head and the wall, measured from
-  # the back face of the pad. They trap the head. The screws have to
-  # stand `lip` + `head_h` to `lip` + `head_h` + `clear` off the wall.
-  lip: 2.0
+  # The keys on the rail: `key` is how wide a key is where it leaves the
+  # rail (so the socket's mouth is `key` + `clear`), and `grip` is how
+  # far it stands out and, at 45 degrees, how far it spreads each side.
+  # `grip` is what holds the pot in: more of it grips harder and needs
+  # thicker pads, less of it is slimmer but shallower.
+  key: 5.0
+  grip: 2.5
 
   # Pad width around the pot (mm). Bigger = stiffer mount, more plastic.
+  # It has to cover the socket and hide the rail.
   width: 16.0
 
   # 45 degree break on the pads' outside edges (mm): where the back face
   # meets the top and the sides, and where the top meets the sides. 0
-  # leaves them sharp. It has to stay clear of the slot, so it can be at
-  # most (width - head - clear) / 2 and at most lip + 2.
+  # leaves them sharp. It has to stay clear of the socket, so it can be
+  # at most (width - key - clear) / 2 and at most grip + clear + 2.
   chamfer: 1.0
 
   # How far the pot slides down to seat (mm). Clamped to what the cup
