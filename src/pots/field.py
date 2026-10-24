@@ -17,10 +17,11 @@ BLEND = 1.5           # blend between a 3D pattern (weave) and the solid rim/bas
 NEAR = 2.5
 
 
-def make_field(pot, pattern, params=None):
+def make_field(pot, pattern, params=None, clips=None):
     """Return field(X, Y, Z) for `pot` with the wall pattern named `pattern`.
     `params`: the pattern settings (the `patterns` config node); None = the
-    defaults in config/patterns.yaml."""
+    defaults in config/patterns.yaml. `clips`: a `Clips` (clips.py) to hang
+    the pot on a wall with, or None."""
     kind, fn = PATTERNS[pattern].kind, PATTERNS[pattern].fn
     P = load_params(params)
 
@@ -55,6 +56,9 @@ def make_field(pot, pattern, params=None):
         # more than NEAR away and change no value near zero (see NEAR)
         low = Z < pot.cup_h + NEAR
         body[low] = bottom(body[low], r[low], Z[low])
+        if clips is not None:
+            # the pads stand outside the shell, so they see every point
+            body = clips.carve(body, X, Y, Z)
         return body
 
     def bottom(wall, r, Z):

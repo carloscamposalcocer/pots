@@ -162,6 +162,12 @@ def shade(depth, normal, elev, azim, scale, shadow=None, color=CLAY):
     return img.clip(0, 1)
 
 
+def view_radius(mesh, pot):
+    """Half-width (mm) the views need: the pot, or further out if it has
+    wall-mount pads (they stick out past the cup)."""
+    return max(float(pot.r_wide), float(np.abs(mesh.bounds[:, :2]).max()))
+
+
 def draw_mesh(ax, mesh, pot, elev, azim, pad=4, tight=False, px=900, shadow=True):
     """Render `mesh` onto a 2D axis: z-buffered, smooth-shaded terracotta.
     `tight` fits the frame to the pot; `px` is the rendered width in pixels."""
@@ -169,7 +175,7 @@ def draw_mesh(ax, mesh, pot, elev, azim, pad=4, tight=False, px=900, shadow=True
     if len(mesh.faces) > PREVIEW_FACES:
         mesh = decimate(mesh, PREVIEW_FACES)
     e = np.radians(elev)
-    R = pot.r_wide + pad
+    R = view_radius(mesh, pot) + pad
     zpad = 2 if tight else 10
     box = (-R, R, -R * np.sin(e) - zpad * np.cos(e) - (4 if shadow else 0), pot.height * np.cos(e) + R * np.sin(e) + zpad)
     scale = px / (2 * R)
@@ -211,7 +217,8 @@ def render(mesh, field, pot, path, title):
 
     # vertical section straight from the field
     ax = fig.add_subplot(2, 3, 3)
-    s = np.arange(-pot.r_max, pot.r_max, 0.15); z = np.arange(-1, pot.height + 1, 0.15)
+    R = max(pot.r_max, view_radius(mesh, pot) + 1)
+    s = np.arange(-R, R, 0.15); z = np.arange(-1, pot.height + 1, 0.15)
     S, Z = np.meshgrid(s, z)
     F = field(S.astype(np.float32), np.full(S.shape, 0.7, np.float32), Z.astype(np.float32)) < 0
     ax.imshow(F, origin="lower", extent=[s[0], s[-1], z[0], z[-1]], cmap=ListedColormap([PAPER, CLAY_HEX]))

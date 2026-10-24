@@ -40,6 +40,7 @@ pots quality=full                     # print-quality mesh, use this for the fil
 pots size=small                       # the 50 mm pot
 pots size=small height=65             # start from a preset, change one value
 pots pattern=hex design.wall=4        # another pattern, thinner wall
+pots clips.enable=true                # add the two wall-mount pads
 pots height=65 --show                 # print the final settings, don't build
 pots --all                            # every pattern, one after another
 pots -v                               # debug logging
@@ -70,6 +71,7 @@ Written to `out` (default `output/<pattern>_<shape>_h<height>/`):
 | `shape` | `tapered` | Pot profile, see [Pot shapes](#pot-shapes). |
 | `size` | `big` | Size preset: `big` or `small`, see [Size presets](#size-presets-srcpotsconfigsize). |
 | `height` | from `size` | Pot height in mm. **Drives the whole shape**, see [Scaling](#scaling-with-height). Minimum `base + rim + 10` (17.4 mm). |
+| `clips.enable` | `false` | Add the two wall-mount pads, see [Wall mount](#wall-mount-clips). |
 | `preview` | `true` | Also render the PNG preview (~20 s). |
 | `out` | `output/${pattern}_${shape}_h${height}` | Output folder; existing files are overwritten. |
 | `quality` | `draft` | Mesh quality preset: `draft` (fast check) or `full` (for printing). |
@@ -114,6 +116,61 @@ pot size, so they **do not scale** with `height`.
 | `design.skin` | 1.6 | Solid soil-side layer behind the pattern. Where it is, the holes become blind pockets, so water poured on the soil can't run out through the wall. 0 = holes go right through. |
 | `design.skin_frac` | 0.67 | Share of the height, from the top, that gets the skin. Below it the holes stay open for air and drainage into the cup. |
 
+### Wall mount (`clips.*`)
+
+`clips.enable=true` adds two small pads to the back of the pot, one on the
+cup and one at the top, each with a T-slot. The pot then hangs on a pair of
+screws and lifts straight off again.
+
+```sh
+pots clips.enable=true                       # defaults: 4 mm screws, 9 x 3 mm heads
+pots clips.enable=true clips.head=8 clips.travel=10
+pots clips.enable=true clips.at=0            # pads on the front, for the preview
+```
+
+To hang it:
+
+1. Build the pot and read the line the build prints, for example
+   `clips: two screws (shank 4 mm, head up to 9 x 3 mm) 81.3 mm apart
+   vertically, standing 5.0-5.6 mm off the wall; the pot slides down 7.0 mm
+   onto them`.
+2. Drive two screws into the wall, one above the other, exactly that far
+   apart, and leave their heads standing that far proud.
+3. Hold the pot with both heads at the open bottoms of the two slots, push
+   it flat against the wall and slide it down. The upper slot ends in a flat
+   seat that the screw rests on; that is what carries the pot. The lower
+   slot runs right through its pad, so it only keeps the bottom against the
+   wall and stops it swinging - a few mm of drilling error just leaves the
+   lower screw a little higher or lower in its slot.
+4. To take the pot down, lift it straight up and off.
+
+The two pads are the only part that touches the wall (everything else keeps
+at least 1 mm of air), and the wall behind the upper pad is filled solid, so
+the mount hangs on a solid patch of pot rather than on the pattern. Their
+outside edges are broken with a 45° chamfer (`clips.chamfer`), the bottom
+back edge of the lower one with the same elephant-foot chamfer as the pot.
+
+| Key | Default | Description |
+|---|---|---|
+| `clips.enable` | `false` | Add the pads. |
+| `clips.screw` | 4.0 | Screw shank diameter (mm). The slot in the back face is this + `clear` wide. |
+| `clips.head` | 9.0 | Screw head diameter (mm); the recess behind the lips is this + `clear`. Measure yours: a 4 mm wall screw or a #8 is about 8-9 mm. |
+| `clips.head_h` | 3.0 | Screw head thickness (mm). |
+| `clips.clear` | 0.6 | Clearance added around the screw (mm). |
+| `clips.lip` | 2.0 | Lips that trap the head, measured from the back face (mm). The heads must stand `lip + head_h` to `lip + head_h + clear` off the wall. |
+| `clips.width` | 16.0 | Pad width around the pot (mm). Wider = stiffer mount, more plastic. |
+| `clips.chamfer` | 1.0 | 45° break on the pads' outside edges (mm): back-to-top, back-to-sides and top-to-sides. 0 leaves them sharp; it must stay clear of the slot, so at most `(width - head - clear) / 2` and at most `lip + 2`. |
+| `clips.travel` | 7.0 | How far the pot slides down to seat (mm). Shortened automatically when the cup is too short for it (the build warns). |
+| `clips.at` | 180.0 | Where the pads sit around the pot (degrees). 180 is the back, away from the preview's front view. |
+
+Sizes are in mm and **do not scale** with `height` - screws don't. What does
+scale is the cup, which carries the lower pad: below about 46 mm of pot
+height there is no room for a usable slide and `clips.enable=true` is
+refused. On a `size=small` pot the pads look chunky for the same reason;
+smaller screws shrink them (`clips.screw=3 clips.head=7 clips.head_h=2.3
+clips.width=13`), and a thinner head is what pulls the pot closest to the
+wall, since the standoff is set by how deep the slot has to be.
+
 ### Pattern settings (`patterns.<name>.*`, `src/pots/config/patterns.yaml`)
 
 Every pattern has its own block in `patterns.yaml`: cell count, strut or
@@ -132,7 +189,7 @@ Keys most patterns share:
 | `cells` | Cells around the pot at the 130 mm reference height; scaled with `height` (see [Scaling](#scaling-with-height)). More cells = smaller holes. |
 | `strut_in` | Tapered patterns (`voronoi`, `hex`, `drops`, `lattice`, `isogrid`, `cubes`, `voxel`): strut width on the soil side (2.2 mm; `lattice` 3.0; the cube patterns 1.4, their holes are smaller). Wider = smaller inner holes = less soil loss, less air. Keep ≥ ~1.1 (0.4 mm nozzle). |
 | `strut_out` | Tapered patterns: strut width on the outside (`voronoi` and the cube patterns 0.5, `lattice` and `isogrid` 0.3, `hex` and `drops` 1.1 mm). Keep ≤ `strut_in` so holes widen outward. The strut is a wedge through the wall, so one face may be thinner than the nozzle as long as the other is not (`pots` warns only when both are below ~1.1 mm): the slicer just trims the tip and the holes on that face get a little bigger. |
-| `center` | Tapered patterns, 0 to 1 (1 on `voronoi`, `drops`, `lattice`, `isogrid`; 0 on `hex`). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex`, `isogrid` and the cube patterns (flat or 30� bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice` have pointed roofs and barely change. |
+| `center` | Tapered patterns, 0 to 1 (1 on `voronoi`, `drops`, `lattice`, `isogrid`; 0 on `hex`). 0 keeps each hole roof where it is from the soil side out, so holes grow only sideways and downward. 1 moves the soil-side pattern down so each hole is centred on its outside opening; the roof then rises 0.6–1 mm across the wall. On `voronoi`, `hex`, `isogrid` and the cube patterns (flat or 30° bridge roofs) that makes sloped ceilings that may sag, and `pots` warns; `drops` and `lattice` have pointed roofs and barely change. |
 
 With the defaults, on the 100 mm pot (6 mm wall):
 
@@ -201,7 +258,7 @@ from outside, next to a 40 x 30 mm true-scale swatch of the outer wall face
 |---|---|
 | **`voronoi`** (default), 2D, tapered: organic cells that flare outward like funnels. <br> ![voronoi](docs/patterns/voronoi.png) | **`hex`**, 2D, tapered: regular honeycomb, pointy-top cells about 6 mm across, flaring outward like `voronoi` (`warp` / `warp_z` make it wavy). <br> ![hex](docs/patterns/hex.png) |
 | **`drops`**, 2D, tapered: staggered teardrops with 55° pointed tops, flaring outward. <br> ![drops](docs/patterns/drops.png) | **`lattice`**, 2D, tapered: diamond trellis of helical strips crossing at ±55°, no bridges at all, flaring outward like `voronoi`. <br> ![lattice](docs/patterns/lattice.png) |
-| **`isogrid`**, 2D, tapered: triangle grid flaring outward like `voronoi`; the downward triangles have short flat bridges. <br> ![isogrid](docs/patterns/isogrid.png) | **`cubes`**, 2D, tapered: tumbling blocks, the classic isometric cube illusion: each cube a top diamond and two side faces, 60� rhombi with vertical and 30� edges (the roofs are 30� tents, as on `hex`). Flares outward like `voronoi`. <br> ![cubes](docs/patterns/cubes.png) |
+| **`isogrid`**, 2D, tapered: triangle grid flaring outward like `voronoi`; the downward triangles have short flat bridges. <br> ![isogrid](docs/patterns/isogrid.png) | **`cubes`**, 2D, tapered: tumbling blocks, the classic isometric cube illusion: each cube a top diamond and two side faces, 60° rhombi with vertical and 30° edges (the roofs are 30° tents, as on `hex`). Flares outward like `voronoi`. <br> ![cubes](docs/patterns/cubes.png) |
 | **`voxel`**, 2D, tapered: the same cubes reshuffled at random into stacks and hollows (random cube flips of the tiling, `sweeps` rounds; `seed` picks another stacking). <br> ![voxel](docs/patterns/voxel.png) | **`louvers`**, 2D: gills that run down and outward through the wall like shutter blades. No line of sight: soil stays in, rain runs off. <br> ![louvers](docs/patterns/louvers.png) |
 | **`slots`**, 2D: narrow wavy vertical slots, air-pruning style. <br> ![slots](docs/patterns/slots.png) | **`spiral`**, 2D: slots on a many-start 60° helix. <br> ![spiral](docs/patterns/spiral.png) |
 | **`chevrons`**, 2D: stacked arrowhead slots. <br> ![chevrons](docs/patterns/chevrons.png) | **`weave`**, 3D: two sets of strips woven over and under through the wall (the swatch shows only where they touch the outer face). <br> ![weave](docs/patterns/weave.png) |
@@ -249,6 +306,11 @@ The generator follows these; keep them when changing the code:
   at least that thick.
 - 45° chamfer on the bottom outer edge (elephant foot).
 - Every pattern is periodic around the circumference.
+- The wall-mount pads obey the same rules: the lower one is a prism rising
+  from the build plate (no overhang at all), the upper one is a prism with a
+  45° wedge underside, and the only roofs in their slots are the seat (a
+  bridge as wide as the slot) and a 45° ramp over the head recess. Turning
+  the clips on does not change the overhang share.
 
 ## Using it from Python
 
@@ -270,6 +332,7 @@ src/pots/
   gallery.py    `pots-gallery` command: every pattern + README images
   config/       Hydra config: config.yaml and the quality/ and size/ presets
   geometry.py   Pot: all dimensions, scaled from the height
+  clips.py      Clips: the optional wall-mount pads, as field and as solid
   patterns.py   wall patterns (PATTERNS registry)
   field.py      make_field(): wall + rim + base + cup as one implicit field
   sdf.py        field helper (smin)

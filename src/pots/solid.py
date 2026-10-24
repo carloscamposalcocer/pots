@@ -232,9 +232,10 @@ def _disjoint(pot, groups):
     return True
 
 
-def build_solid(pot, outlines):
+def build_solid(pot, outlines, clips=None):
     """The pot with holes `outlines`, given at depths(pot) (see the module
-    doc), as a trimesh."""
+    doc), as a trimesh. `clips`: a `Clips` (clips.py) whose pads are unioned
+    on after the holes are cut, or None."""
     from manifold3d import Manifold, Mesh, OpType
     t0 = time.perf_counter()
     s = depths(pot)
@@ -265,6 +266,8 @@ def build_solid(pot, outlines):
         body = _revolve(profile, pot.r_max, turn)
         if holes is not None:
             body = body - (holes ^ _clip(pot, turn))
+        if clips is not None:
+            body = body + clips.solid(turn)
         m = body.to_mesh()
         mesh = trimesh.Trimesh(m.vert_properties[:, :3], m.tri_verts, process=True)
         if mesh.is_watertight:

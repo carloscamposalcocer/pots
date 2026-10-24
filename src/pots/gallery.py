@@ -28,7 +28,7 @@ import sys
 import time
 from pathlib import Path
 
-from .cli import load_config, pot_from_config, setup_logging
+from .cli import clips_from_config, load_config, pot_from_config, setup_logging
 from .patterns import PATTERNS
 
 log = logging.getLogger("pots")
@@ -68,6 +68,7 @@ def main(argv=None):
     try:
         cfg = load_config(overrides)
         pot = pot_from_config(cfg)
+        clips = clips_from_config(cfg, pot)
     except HydraException as e:
         raise SystemExit(f"bad setting: {e}".splitlines()[0])
     except (ValueError, TypeError) as e:
@@ -78,21 +79,22 @@ def main(argv=None):
     from .preview import render_card
 
     if shapes:
-        build_shapes(pot, cfg, shapes_image)
+        build_shapes(pot, cfg, clips, shapes_image)
         return
 
     images.mkdir(parents=True, exist_ok=True)
     log.info("pot H %g mm, wall %g mm, voxel %g mm -> %s", pot.height, pot.wall, cfg.quality.voxel, images)
     for name in names or list(PATTERNS):
         t = time.perf_counter()
-        m, field = generate(pot, name, cfg.quality.voxel, cfg.quality.faces, cfg.patterns, cfg.mesher)
+        m, field = generate(pot, name, cfg.quality.voxel, cfg.quality.faces, cfg.patterns,
+                            cfg.mesher, clips)
         if not m.is_watertight or m.body_count != 1:
             log.warning("%s: mesh is not a single watertight body", name)
         render_card(m, field, pot, images / f"{name}.png", f"{name}  (H {pot.height:g} mm)")
         log.info("%s done in %.0f s", name, time.perf_counter() - t)
 
 
-def build_shapes(pot, cfg, path):
+def build_shapes(pot, cfg, clips, path):
     """Build the pot in every shape (the config's pattern) and draw the shape sheet."""
     import dataclasses
 
@@ -103,8 +105,9 @@ def build_shapes(pot, cfg, path):
     meshes = {}
     for name in SHAPES:
         t = time.perf_counter()
-        m, _ = generate(dataclasses.replace(pot, shape=name), cfg.pattern, cfg.quality.voxel,
-                        cfg.quality.faces, cfg.patterns, cfg.mesher)
+        p = dataclasses.replace(pot, shape=name)
+        m, _ = generate(p, cfg.pattern, cfg.quality.voxel, cfg.quality.faces, cfg.patterns,
+                        cfg.mesher, dataclasses.replace(clips, pot=p) if clips else None)
         if not m.is_watertight or m.body_count != 1:
             log.warning("%s: mesh is not a single watertight body", name)
         meshes[name] = m

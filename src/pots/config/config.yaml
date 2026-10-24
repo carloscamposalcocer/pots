@@ -108,4 +108,60 @@ design:
   # drains into the cup. 0.67 = the top two thirds are closed.
   skin_frac: 0.67
 
+# ---------------------------------------------------------------------
+# clips: optional wall mount. Two small pads on the back of the pot, one
+# on the cup and one at the top, each with a T-slot. Drive two screws
+# into the wall, one above the other, `spacing` apart (the build log
+# prints the number) and leave their heads standing off the wall; then
+# hold the pot with both heads at the open bottoms of the slots, push it
+# flat and slide it down. The upper slot ends in a flat seat that carries
+# the pot; the lower slot runs right through, so it only keeps the bottom
+# against the wall and a few mm of drilling error cost nothing. Lift the
+# pot straight up to take it off again.
+#
+# The pads are the only part that touches the wall. Every size is in mm
+# and none of them scale with the pot (screws don't); only how far the
+# pot slides is limited by the height of the cup, which does scale, so
+# clips need a pot of about 46 mm or taller (the log says if the slide
+# had to be shortened).
+# ---------------------------------------------------------------------
+clips:
+  # enable: add the two pads. Off by default (a plain pot to stand up).
+  enable: false
+
+  # Screw shank diameter (mm): the slot in the back face is this plus
+  # `clear` wide, and the pot hangs on the shank of the upper screw.
+  screw: 4.0
+
+  # Screw head: diameter and thickness (mm). Must be wider than the
+  # shank; the recess behind the lips is this plus `clear`. Measure the
+  # screws you have (a 4 mm wall screw or a #8 is about 8-9 x 3 mm).
+  head: 9.0
+  head_h: 3.0
+
+  # Clearance around the screw (mm): added to every slot size.
+  clear: 0.6
+
+  # Lips (mm): the material between the head and the wall, measured from
+  # the back face of the pad. They trap the head. The screws have to
+  # stand `lip` + `head_h` to `lip` + `head_h` + `clear` off the wall.
+  lip: 2.0
+
+  # Pad width around the pot (mm). Bigger = stiffer mount, more plastic.
+  width: 16.0
+
+  # 45 degree break on the pads' outside edges (mm): where the back face
+  # meets the top and the sides, and where the top meets the sides. 0
+  # leaves them sharp. It has to stay clear of the slot, so it can be at
+  # most (width - head - clear) / 2 and at most lip + 2.
+  chamfer: 1.0
+
+  # How far the pot slides down to seat (mm). Clamped to what the cup
+  # leaves room for on a small pot.
+  travel: 7.0
+
+  # Where the pads sit around the pot, in degrees. 180 puts them
+  # opposite the preview's front view.
+  at: 180.0
+
 # Pattern settings (cell size, strut widths, ...): config/patterns.yaml.

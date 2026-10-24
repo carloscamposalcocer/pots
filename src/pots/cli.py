@@ -11,6 +11,7 @@ Examples
     pots size=small height=65         # start from a preset, change one value
     pots pattern=hex                  # another pattern
     pots shape=barrel                 # another pot shape
+    pots clips.enable=true            # add the two wall-mount pads (see config.yaml)
     pots design.wall=4                # thinner wall (mm, does not scale)
     pots pattern=lattice patterns.lattice.strut_in=2.5
                                       # a pattern setting (config/patterns.yaml)
@@ -58,6 +59,19 @@ def load_config(overrides):
     import hydra
     with hydra.initialize_config_dir(config_dir=str(CONFIG_DIR), version_base="1.3"):
         return hydra.compose("config", overrides=overrides)
+
+
+def clips_from_config(cfg, pot):
+    """The wall-mount pads for a config, or None; raises ValueError with a
+    user-facing message. Warns when the cup limits the slide."""
+    if not cfg.clips.enable:
+        return None
+    from .clips import Clips
+    clips = Clips(pot, **{k: float(v) for k, v in cfg.clips.items() if k != "enable"})
+    if clips.slide < clips.travel - 1e-9:
+        log.warning("the cup is only %.1f mm tall: the clips slide %.1f mm, not clips.travel=%.1f",
+                    pot.cup_h, clips.slide, clips.travel)
+    return clips
 
 
 def pot_from_config(cfg):
@@ -119,12 +133,15 @@ def run(cfg):
 
     try:
         pot = pot_from_config(cfg)
+        clips = clips_from_config(cfg, pot)
     except (ValueError, TypeError) as e:
         log.error(e)
         raise SystemExit(2)
     q = cfg.quality
     log.info("%s pot, height %.1f mm (x%.3f): radius %.1f -> %.1f mm, cup %.1f mm tall, wall %.1f mm",
              pot.shape, pot.height, pot.k, pot.r_bot, pot.r_top, pot.cup_h, pot.wall)
+    if clips is not None:
+        log.info("clips: %s", clips)
 
     out = Path(cfg.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -133,7 +150,7 @@ def run(cfg):
     base = out / name
     t = time.perf_counter()
     log.info("[1/3] building")
-    m, field = generate(pot, cfg.pattern, q.voxel, q.faces, cfg.patterns, cfg.mesher)
+    m, field = generate(pot, cfg.pattern, q.voxel, q.faces, cfg.patterns, cfg.mesher, clips)
     size = np.ptp(m.bounds, axis=0)
     log.info("mesh  faces=%s  watertight=%s  bodies=%d  size=%.1f x %.1f x %.1f mm  volume=%.0f cm3",
              f"{len(m.faces):,}", m.is_watertight, m.body_count, *size, m.volume / 1000)

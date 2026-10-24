@@ -1,7 +1,9 @@
+import logging
+
 import pytest
 from omegaconf import OmegaConf
 
-from pots.cli import CONFIG_DIR, load_config, main, pot_from_config
+from pots.cli import CONFIG_DIR, clips_from_config, load_config, main, pot_from_config
 from pots.patterns import PATTERNS
 
 
@@ -57,6 +59,29 @@ def test_overrides_beat_size_preset():
     height, wall = preset.height + 7, preset.design.wall - 1     # anything the preset doesn't set
     pot = pot_from_config(load_config(["size=big", f"height={height}", f"design.wall={wall}"]))
     assert (pot.height, pot.wall) == (height, wall)
+
+
+def test_clips_are_off_until_asked_for():
+    cfg = load_config([])
+    assert clips_from_config(cfg, pot_from_config(cfg)) is None
+    cfg = load_config(["clips.enable=true", "clips.head=8", "clips.width=20"])
+    clips = clips_from_config(cfg, pot_from_config(cfg))
+    assert (clips.head, clips.width) == (8.0, 20.0)
+    assert clips.spacing > 0 and clips.slide == clips.travel
+
+
+def test_clips_warn_when_the_cup_limits_the_slide(caplog):
+    cfg = load_config(["size=small", "clips.enable=true"])
+    with caplog.at_level(logging.WARNING, logger="pots.cli"):
+        clips = clips_from_config(cfg, pot_from_config(cfg))
+    assert clips.slide < clips.travel
+    assert "slide" in caplog.text
+
+
+def test_clips_on_a_pot_too_small_for_them():
+    cfg = load_config(["height=30", "design.wall=4", "clips.enable=true"])
+    with pytest.raises(ValueError, match="taller pot"):
+        clips_from_config(cfg, pot_from_config(cfg))
 
 
 def test_all_configs(capsys):
