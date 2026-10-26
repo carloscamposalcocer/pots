@@ -40,6 +40,7 @@ pots quality=full                     # print-quality mesh, use this for the fil
 pots size=small                       # the 50 mm pot
 pots size=small height=65             # start from a preset, change one value
 pots pattern=hex design.wall=4        # another pattern, thinner wall
+pots holder.enable=true               # also a holder to hang the pot on a wall
 pots height=65 --show                 # print the final settings, don't build
 pots --all                            # every pattern, one after another
 pots -v                               # debug logging
@@ -58,6 +59,8 @@ Written to `out` (default `output/<pattern>_<shape>_h<height>/`):
 | `<pattern>_<shape>_h<height>.stl` | print file |
 | `<pattern>_<shape>_h<height>.3mf` | same mesh, ~5x smaller |
 | `<pattern>_<shape>_h<height>.png` | preview: outside, cut-away, vertical section, both wall faces at true scale with their open % |
+| `<pattern>_<shape>_h<height>_holder.stl` / `.3mf` | with `holder.enable=true`: the wall holder, a separate part, lying in its print orientation |
+| `<pattern>_<shape>_h<height>_holder.png` | with `holder.enable=true`: the holder on the pot, a section through both, the part as printed |
 | `config.yaml` | the exact settings used for this pot |
 
 ## Parameters
@@ -191,6 +194,47 @@ open about the same on all six). No wall leans more than 24° from vertical, and
 the cup follows the shape: it starts a moat gap out from the pot and its lip
 sits just outside the widest part of the wall above it.
 
+## Wall holder
+
+`pots holder.enable=true` also makes a holder that hangs the pot on a wall.
+It is a separate part and **the pot does not change**, so it fits pots you
+have already printed (build it with the same `height`, `shape` and
+`design.*` they were printed with).
+
+![wall holder](docs/holder.png)
+
+A back plate is screwed to the wall (two screws, heads sunk into the front
+of the plate, behind the pot). At the top a bridge reaches over the rim and
+a finger hangs down inside it. At the bottom a seat hugs the back of the
+cup, with a ledge under the base. The ledge carries the pot. The pot's
+weight is on its axis, in front of the ledge, so the pot wants to tip
+forward, and the finger inside the rim stops it. Every face that touches
+the pot follows its surface, `holder.clear` off it, for every shape and
+height.
+
+**Hanging the pot:** tilt its bottom out a little, slide the back of the rim
+up into the hook, swing the bottom in over the ledge and let it down onto
+it. Take it off the same way backwards: lift it the 1.5 mm the hook
+allows, swing the bottom out, and drop it off the finger. The tests check
+that this works for every shape: the bottom swings out 4 to 6 degrees on a
+100 to 130 mm pot, and up to ~13 degrees on a 50 mm one.
+
+It prints lying on its side, with no supports. Every layer is the same
+section, and only the two screw holes cross the layers, so they get
+teardrop roofs. Pots under ~46 mm need a narrower `holder.width`; the
+holder needs a pot of at least ~40 mm.
+
+| Key | Default | Description |
+|---|---|---|
+| `holder.enable` | false | Also make the holder. |
+| `holder.screw` / `head` / `head_h` | 4 / 9 / 3 | The wall screws: shank and head diameter, head thickness. The plate is `head_h` + `clear` + 1.6 mm thick. |
+| `holder.clear` | 0.5 | Air between the holder and the pot, and around the screws. |
+| `holder.width` | 20 | Width across the back of the pot. At least ~15.6 mm (a counterbore and its teardrop roof), at most the pot's narrowest radius. |
+| `holder.thick` | 4 | Thickness of the bridge, the finger and the ledge. |
+| `holder.drop` | 6 | How far the finger reaches down inside the rim. |
+| `holder.ledge` | 6 | How far the ledge reaches in under the base. Longer means more bearing, but the pot has to swing further out to come off. |
+| `holder.lift` | 1.5 | Air above the rim: how far the pot lifts before it swings out. |
+
 ## Patterns
 
 Pick one with `pattern=<name>`. Each image shows the 50 mm pot (`pots-gallery size=small`)
@@ -276,11 +320,13 @@ src/pots/
   mesh.py       slab-wise marching cubes, decimation and repair
   solid.py      exact mesh: revolved pot minus lofted hole cutters (manifold3d)
   pipeline.py   generate(): exact or marching-cubes mesh, plus the field
+  holder.py     Holder: the separate wall holder (manifold3d)
   metrics.py    open %, hole size and straight-through % of both wall faces
   preview.py    PNG preview and the small gallery image
 tests/          pytest suite (uv run pytest)
 docs/patterns/  gallery images used in this README (pots-gallery)
 docs/shapes.png pot shape sheet (pots-gallery --shapes size=big)
+docs/holder.png the wall holder (pots holder.enable=true)
 ```
 
 ### How the mesh is made

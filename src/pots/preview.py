@@ -230,6 +230,79 @@ def render(mesh, field, pot, path, title):
     log.info("preview saved %s in %.1f s", path, time.perf_counter() - t0)
 
 
+HOLDER = np.array([0.36, 0.45, 0.52])         # rendered wall holder (slate, so it reads apart from the pot)
+HOLDER_HEX, WALL_HEX = "#5c7385", "#b9b0a8"
+
+
+def draw_meshes(ax, parts, elev, azim, px=700, pad=4):
+    """Render several (mesh, colour) parts together onto a 2D axis, framed to
+    their bounds: one z-buffer, so they hide each other where they should."""
+    _, right, up = view_basis(elev, azim)
+    V = np.vstack([m.vertices for m, _ in parts])
+    u, v = V @ right, V @ up
+    box = (u.min() - pad, u.max() + pad, v.min() - pad, v.max() + pad)
+    scale = px / (box[1] - box[0])
+    depth, normal, color = None, None, None
+    for m, c in parts:
+        d, n = rasterize(m, elev, azim, box, scale)
+        if depth is None:
+            depth, normal, color = d, n, np.broadcast_to(c, d.shape + (3,)).copy()
+            continue
+        near = d > depth
+        depth, normal = np.where(near, d, depth), np.where(near[..., None], n, normal)
+        color[near] = c
+    ax.imshow(shade(depth, normal, elev, azim, scale, color=color), extent=box, interpolation="antialiased")
+    ax.set_xlim(box[0], box[1]); ax.set_ylim(box[2], box[3]); ax.set_aspect("equal")
+    ax.set_axis_off()
+
+
+def centre_section(mesh):
+    """The mesh cut by the plane y = 0, as (x, z) rings (manifold3d; [] if it
+    is not a valid manifold)."""
+    from manifold3d import Manifold, Mesh
+    m = Manifold(Mesh(np.asarray(mesh.vertices, np.float32), np.asarray(mesh.faces, np.uint32)))
+    if m.is_empty():
+        return []
+    return [np.asarray(r) for r in m.rotate([-90, 0, 0]).slice(0.0).to_polygons()]
+
+
+def render_holder(mesh, holder, path, title):
+    """The wall holder: holding the pot (seen from behind, beside the wall),
+    a section through both on the holder's centre line, and the part alone
+    as it lies on the bed."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    t0 = time.perf_counter()
+    mounted = holder.mesh("pot")
+    fig = plt.figure(figsize=(16, 7), facecolor="white")
+    ax = fig.add_subplot(1, 3, 1)
+    draw_meshes(ax, [(mesh, CLAY), (mounted, HOLDER)], 18, 35); style(ax, "Holding the pot (from behind)")
+
+    ax = fig.add_subplot(1, 3, 2)
+    from matplotlib.patches import PathPatch
+    from matplotlib.path import Path as MPath
+    for m, c in ((mesh, CLAY_HEX), (mounted, HOLDER_HEX)):
+        rings = centre_section(m)
+        if rings:   # outer rings counter-clockwise, holes clockwise: the nonzero rule fills it right
+            verts = np.vstack([np.vstack([r, r[:1]]) for r in rings])
+            codes = np.concatenate([[MPath.MOVETO] + [MPath.LINETO] * (len(r) - 1) + [MPath.CLOSEPOLY]
+                                    for r in rings])
+            ax.add_patch(PathPatch(MPath(verts, codes), facecolor=c, lw=0))
+    ax.axvline(holder.x_wall, color=WALL_HEX, lw=6)
+    x0 = holder.env(0.0) - holder.ledge - 12
+    ax.set_xlim(x0, holder.x_wall + 6); ax.set_ylim(holder.bottom - 4, holder.top + 4)
+    ax.set_aspect("equal"); ax.tick_params(colors=MUTED)
+    style(ax, "Section on the centre line (mm, wall at right)")
+
+    ax = fig.add_subplot(1, 3, 3)
+    draw_meshes(ax, [(holder.mesh(), HOLDER)], 40, -60); style(ax, "Holder as printed (on its side)")
+    fig.suptitle(f"{title}\n{holder}", fontsize=13, color=INK)
+    plt.tight_layout(); plt.savefig(path, dpi=85); plt.close(fig)
+    log.info("holder preview saved %s in %.1f s", path, time.perf_counter() - t0)
+
+
 def render_card(mesh, field, pot, path, title):
     """Small gallery image: outside view + a 40 x 30 mm true-scale swatch of the outer face."""
     import matplotlib

@@ -108,4 +108,48 @@ design:
   # drains into the cup. 0.67 = the top two thirds are closed.
   skin_frac: 0.67
 
+# ---------------------------------------------------------------------
+# holder: a separate part that hangs the pot on a wall, nothing on the
+# pot changes. A plate screwed to the wall, a hook over the back of the
+# rim with a finger inside it, and a seat that hugs the back of the cup
+# with a ledge under the base. With it on, the run also writes
+# <name>_holder.stl / .3mf, lying in its print orientation (on its side,
+# no supports).
+# To hang the pot: tilt the bottom out, slide the back of the rim up into
+# the hook, swing the bottom in over the ledge and let it down.
+# ---------------------------------------------------------------------
+holder:
+  # enable: also make the holder. Off by default.
+  enable: false
+
+  # The wall screws you will use: shank diameter, head diameter and head
+  # thickness (mm). The heads sink into counterbores in the front of the
+  # plate, behind the pot; the plate is head_h + clear + 1.6 mm thick.
+  screw: 4.0
+  head: 9.0
+  head_h: 3.0
+
+  # Air between the holder and the pot (mm), and around the screws.
+  clear: 0.5
+
+  # How wide the holder is, across the back of the pot (mm). It has to
+  # hold a counterbore with its teardrop roof (about 15 mm with the
+  # default screws).
+  width: 20.0
+
+  # Thickness of the bridge over the rim, the finger and the ledge (mm).
+  thick: 4.0
+
+  # How far the finger reaches down inside the rim (mm): it is what
+  # keeps the pot from tipping forward.
+  drop: 6.0
+
+  # How far the ledge reaches in under the base (mm): it carries the
+  # pot. Longer = more bearing, but the pot has to swing further out to
+  # come off.
+  ledge: 6.0
+
+  # Air above the rim (mm): how far the pot lifts before it swings out.
+  lift: 1.5
+
 # Pattern settings (cell size, strut widths, ...): config/patterns.yaml.

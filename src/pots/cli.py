@@ -11,6 +11,8 @@ Examples
     pots size=small height=65         # start from a preset, change one value
     pots pattern=hex                  # another pattern
     pots shape=barrel                 # another pot shape
+    pots holder.enable=true           # also a holder to hang the pot on a wall
+                                      # (a separate part, see config.yaml)
     pots design.wall=4                # thinner wall (mm, does not scale)
     pots pattern=lattice patterns.lattice.strut_in=2.5
                                       # a pattern setting (config/patterns.yaml)
@@ -28,6 +30,10 @@ Outputs (in `out`, default output/<pattern>_<shape>_h<height>/):
     <pattern>_<shape>_h<height>.stl   print file
     <pattern>_<shape>_h<height>.3mf   same mesh, ~5x smaller file
     <pattern>_<shape>_h<height>.png   preview: outside view, cut-away, wall faces
+    <pattern>_<shape>_h<height>_holder.stl / .3mf / .png
+                           with holder.enable: the wall holder, a separate
+                           part, lying in its print orientation (+ a preview
+                           of it holding the pot)
     config.yaml            the exact settings used
 """
 import logging
@@ -58,6 +64,15 @@ def load_config(overrides):
     import hydra
     with hydra.initialize_config_dir(config_dir=str(CONFIG_DIR), version_base="1.3"):
         return hydra.compose("config", overrides=overrides)
+
+
+def holder_from_config(cfg, pot):
+    """The wall holder for a config, or None; raises ValueError with a
+    user-facing message."""
+    if not cfg.holder.enable:
+        return None
+    from .holder import Holder
+    return Holder(pot, **{k: float(v) for k, v in cfg.holder.items() if k != "enable"})
 
 
 def pot_from_config(cfg):
@@ -115,16 +130,19 @@ def run(cfg):
 
     from .metrics import overhang_share, wall_metrics
     from .pipeline import generate
-    from .preview import render
+    from .preview import render, render_holder
 
     try:
         pot = pot_from_config(cfg)
+        holder = holder_from_config(cfg, pot)
     except (ValueError, TypeError) as e:
         log.error(e)
         raise SystemExit(2)
     q = cfg.quality
     log.info("%s pot, height %.1f mm (x%.3f): radius %.1f -> %.1f mm, cup %.1f mm tall, wall %.1f mm",
              pot.shape, pot.height, pot.k, pot.r_bot, pot.r_top, pot.cup_h, pot.wall)
+    if holder is not None:
+        log.info("holder: %s", holder)
 
     out = Path(cfg.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -144,10 +162,25 @@ def run(cfg):
     log.info("[2/3] exporting %s.stl and %s.3mf", base, base)
     m.export(base.with_suffix(".stl")); m.export(base.with_suffix(".3mf"))
     outs = [base.with_suffix(".stl"), base.with_suffix(".3mf")]
+    if holder is not None:
+        h = holder.mesh()
+        log.info("holder  faces=%s  watertight=%s  bodies=%d  size=%.1f x %.1f x %.1f mm  "
+                 "volume=%.1f cm3  overhangs %.1f%%", f"{len(h.faces):,}", h.is_watertight,
+                 h.body_count, *np.ptp(h.bounds, axis=0), h.volume / 1000, 100 * overhang_share(h))
+        if not h.is_watertight or h.body_count != 1:
+            log.warning("the holder is not a single watertight body; check it before printing")
+        for suffix in (".stl", ".3mf"):
+            path = out / f"{name}_holder{suffix}"
+            h.export(path)
+            outs.append(path)
     if cfg.preview:
         log.info("[3/3] rendering preview")
         render(m, field, pot, base.with_suffix(".png"), f"{cfg.pattern}, {cfg.shape}  (H {pot.height:g} mm)")
         outs.append(base.with_suffix(".png"))
+        if holder is not None:
+            path = out / f"{name}_holder.png"
+            render_holder(m, holder, path, f"wall holder for {cfg.pattern}, {cfg.shape}  (H {pot.height:g} mm)")
+            outs.append(path)
     else:
         log.info("[3/3] skipped preview")
     log.info("done in %.0f s -> %s", time.perf_counter() - t, "  ".join(map(str, outs)))
