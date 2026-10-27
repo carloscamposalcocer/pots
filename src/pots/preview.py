@@ -267,9 +267,9 @@ def centre_section(mesh):
 
 
 def render_holder(mesh, holder, path, title):
-    """The wall holder: holding the pot (seen from behind, beside the wall),
-    a section through both on the holder's centre line, and the part alone
-    as it lies on the bed."""
+    """A wall holder (holder.Holder or clip.Clip): holding the pot (seen from
+    behind, beside the wall), a section through both on the holder's centre
+    line, and the part alone as it stands on the bed."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -292,12 +292,12 @@ def render_holder(mesh, holder, path, title):
             ax.add_patch(PathPatch(MPath(verts, codes), facecolor=c, lw=0))
     ax.axvline(holder.x_wall, color=WALL_HEX, lw=6)
     x0 = holder.env(0.0) - holder.ledge - 12
-    ax.set_xlim(x0, holder.x_wall + 6); ax.set_ylim(holder.bottom - 4, holder.top + 4)
+    ax.set_xlim(x0, holder.x_wall + 6); ax.set_ylim(holder.plate_bottom - 4, holder.top + 4)
     ax.set_aspect("equal"); ax.tick_params(colors=MUTED)
     style(ax, "Section on the centre line (mm, wall at right)")
 
     ax = fig.add_subplot(1, 3, 3)
-    draw_meshes(ax, [(holder.mesh(), HOLDER)], 40, -60); style(ax, "Holder as printed (on its side)")
+    draw_meshes(ax, [(holder.mesh(), HOLDER)], 40, -60); style(ax, f"As printed ({holder.printed})")
     fig.suptitle(f"{title}\n{holder}", fontsize=13, color=INK)
     plt.tight_layout(); plt.savefig(path, dpi=85); plt.close(fig)
     log.info("holder preview saved %s in %.1f s", path, time.perf_counter() - t0)

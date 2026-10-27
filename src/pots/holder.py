@@ -59,6 +59,8 @@ class Holder:
     ledge: float = 6.0        # how far the ledge reaches in under the base
     lift: float = 1.5         # air above the rim: how far the pot lifts to come out
 
+    printed = "on its side"
+
     def __post_init__(self):
         if min(self.screw, self.head, self.head_h, self.clear, self.width,
                self.thick, self.drop, self.ledge, self.lift) <= 0:
@@ -130,6 +132,10 @@ class Holder:
     @property
     def bottom(self):
         return -self.thick
+
+    @property
+    def plate_bottom(self):
+        return self.bottom
 
     @property
     def under(self):

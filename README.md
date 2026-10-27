@@ -41,6 +41,7 @@ pots size=small                       # the 50 mm pot
 pots size=small height=65             # start from a preset, change one value
 pots pattern=hex design.wall=4        # another pattern, thinner wall
 pots holder.enable=true               # also a holder to hang the pot on a wall
+pots clip.enable=true                 # or a clip that holds it by the cup alone
 pots height=65 --show                 # print the final settings, don't build
 pots --all                            # every pattern, one after another
 pots -v                               # debug logging
@@ -61,6 +62,7 @@ Written to `out` (default `output/<pattern>_<shape>_h<height>/`):
 | `<pattern>_<shape>_h<height>.png` | preview: outside, cut-away, vertical section, both wall faces at true scale with their open % |
 | `<pattern>_<shape>_h<height>_holder.stl` / `.3mf` | with `holder.enable=true`: the wall holder, a separate part, lying in its print orientation |
 | `<pattern>_<shape>_h<height>_holder.png` | with `holder.enable=true`: the holder on the pot, a section through both, the part as printed |
+| `<pattern>_<shape>_h<height>_clip.stl` / `.3mf` / `.png` | with `clip.enable=true`: the cup clip, the same way |
 | `config.yaml` | the exact settings used for this pot |
 
 ## Parameters
@@ -235,6 +237,55 @@ holder needs a pot of at least ~40 mm.
 | `holder.ledge` | 6 | How far the ledge reaches in under the base. Longer means more bearing, but the pot has to swing further out to come off. |
 | `holder.lift` | 1.5 | Air above the rim: how far the pot lifts before it swings out. |
 
+## Cup clip
+
+`pots clip.enable=true` makes another wall mount, which holds the pot by its
+cup alone, with a tight fit. Like the holder, it is a separate part and the
+pot does not change. It is made for the standard tapered pot (the tests only
+check that shape).
+
+![cup clip](docs/clip.png)
+
+It is a strip 20 mm wide (`clip.width`): a plate on the wall and a hook
+whose inside has the shape of the back of the cup wall. A finger follows
+the inside of the cup 4 mm down (in the moat between the cup and the pot
+wall), the bridge lies on the lip, the back follows the outside of the cup
+all the way down, and a ledge reaches under the base. The ledge carries the
+pot. The pot's weight is in front of the ledge, so the pot tips forward and
+the finger inside the cup stops it. Everywhere the clip touches the cup, it
+presses `clip.squeeze` (0.3 mm) into it, so the cup wall sits tight in its
+slot. The two screws go in a tail below the ledge, under the pot, where you
+can reach them with the pot on.
+
+**Hanging the pot:** tilt its bottom out, push the back of the cup wall up
+into the slot, and swing the bottom in over the ledge until it snaps in.
+Take it off the same way backwards. The slot follows the cup wall exactly,
+so the pot can't swing in or out without something giving: the lip pushes
+the back of the hook out as it goes. With the best swing (6 to 10 degrees)
+that is about 0.5 mm on a 100 to 130 mm pot and 0.9 mm on a 50 mm one, plus
+the squeeze (the tests check it stays under 0.7 and 1 mm).
+
+**How firm:** with the clip on the cup, the pot's tipping moment is taken
+over a short height, so the finger pushes on the inside of the cup with
+about 5 times the pot's weight. That is ~40 N for a wet 100 mm pot and
+~90 N for a 130 mm one. The holder's finger, at the rim, takes ~5 to 10 N.
+The load lands on the cup's 2.4 mm wall rather than the pot's 5 mm rim.
+These are estimates, not measured on a print.
+
+It prints lying on its side, with no supports, like the holder.
+
+| Key | Default | Description |
+|---|---|---|
+| `clip.enable` | false | Also make the clip. |
+| `clip.screw` / `head` / `head_h` | 4 / 9 / 3 | The wall screws: shank and head diameter, head thickness. |
+| `clip.clear` | 0.5 | Air between the finger and the pot wall, and around the screws. |
+| `clip.width` | 20 | Width of the strip. At least ~15.6 mm, at most the pot's narrowest radius. |
+| `clip.thick` | 3 | Thickness of the bridge, the ledge and the finger. The finger gets thinner where the moat is narrower, down to 1.2 mm. |
+| `clip.drop` | 4 | How far the finger reaches down inside the cup. Longer holds better, but the snap gets stiffer. |
+| `clip.ledge` | 3 | How far the ledge reaches in under the base. |
+| `clip.lift` | 0 | Air above the cup lip. 0 means the bridge lies on the lip. |
+| `clip.squeeze` | 0.3 | How far the clip presses into the cup wall on each side: the grip. 0 is snug with no grip. |
+
 ## Patterns
 
 Pick one with `pattern=<name>`. Each image shows the 50 mm pot (`pots-gallery size=small`)
@@ -321,12 +372,14 @@ src/pots/
   solid.py      exact mesh: revolved pot minus lofted hole cutters (manifold3d)
   pipeline.py   generate(): exact or marching-cubes mesh, plus the field
   holder.py     Holder: the separate wall holder (manifold3d)
+  clip.py       Clip: the separate cup clip (manifold3d)
   metrics.py    open %, hole size and straight-through % of both wall faces
   preview.py    PNG preview and the small gallery image
 tests/          pytest suite (uv run pytest)
 docs/patterns/  gallery images used in this README (pots-gallery)
 docs/shapes.png pot shape sheet (pots-gallery --shapes size=big)
 docs/holder.png the wall holder (pots holder.enable=true)
+docs/clip.png   the cup clip (pots clip.enable=true)
 ```
 
 ### How the mesh is made
