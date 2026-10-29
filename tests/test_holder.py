@@ -103,7 +103,11 @@ def test_holder_bad_settings():
     with pytest.raises(ValueError, match="width must be at least"):
         Holder(pot, width=10)
     with pytest.raises(ValueError, match="positive"):
-        Holder(pot, clear=0)
+        Holder(pot, groove=0)
+    with pytest.raises(ValueError, match="deeper than"):
+        Holder(pot, groove=7)
+    with pytest.raises(ValueError, match="negative"):
+        Holder(pot, clear=-0.1)
     with pytest.raises(ValueError, match="wider than"):
         Holder(pot, head=3)
     with pytest.raises(ValueError, match="too short"):

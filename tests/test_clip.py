@@ -73,12 +73,29 @@ def test_clip_holds():
         [float(clip.ri(clip.tip + 1)) - clip.fin / 2, 0, clip.tip + 1],  # finger, inside the cup
         [lip - 1, 0, clip.top - 1],                                      # bridge, on the lip
         [lip + 0.5, 0, p.cup_h - 1],                                     # back, behind the lip
-        [clip.x_wall - 1, 0, (clip.screw_lo + clip.screw_hi) / 2],       # plate, between the screws
+        [clip.x_wall - 1, 0, clip.top - 1],                              # plate, by the bridge
     ]])
     assert inside.all()
     assert clip.finger > float(p.cup_ri(clip.tip))                       # squeezes the cup's inside
     assert clip.ri(p.cup_h) - clip.fin > float(p.r_out(p.cup_h)) + clip.clear   # clear of the pot wall
-    assert clip.screw_hi < clip.bottom and clip.under == p.cup_h
+    assert clip.under == p.cup_h
+
+
+@pytest.mark.parametrize("h, n", [(50, 1), (100, 1), (130, 2)])
+def test_clip_screws(h, n):
+    """The screws go through the clip behind the cup, below the finger's tip:
+    the counterbores open in the seat, the heads sit behind the cup, and
+    everything the pot touches is left whole."""
+    clip = Clip(pot_for(h, "tapered"))
+    assert len(clip.screws) == n
+    assert max(clip.screws) + clip.sink / 2 < clip.tip
+    assert clip.plate_bottom <= min(clip.screws) - clip.sink / 2 - 1.5
+    head = clip.face + clip.clear                # front of a sunk screw head
+    assert head > float(clip.env(clip.pot.cup_h)) + clip.clear
+    from manifold3d import Manifold
+    m = clip.manifold()
+    for z in clip.screws:                         # the hole goes through to the wall
+        assert (m ^ Manifold.cube([clip.x_wall + 1, 0.5, 0.5]).translate([0, -0.25, z - 0.25])).volume() < 1e-6
 
 
 @pytest.mark.parametrize("h", [50, 100])
@@ -92,8 +109,8 @@ def test_clip_bad_settings():
     pot = pot_for(100, "tapered")
     with pytest.raises(ValueError, match="width must be at least"):
         Clip(pot, width=10)
-    with pytest.raises(ValueError, match="positive"):
-        Clip(pot, clear=0)
+    with pytest.raises(ValueError, match="negative"):
+        Clip(pot, clear=-0.1)
     with pytest.raises(ValueError, match="squeeze"):
         Clip(pot, squeeze=-0.1)
     with pytest.raises(ValueError, match="wider than"):
@@ -110,4 +127,4 @@ def test_clip_config():
     cfg = load_config(["clip.enable=true", "clip.width=18", "size=small"])
     clip = clip_from_config(cfg, pot_from_config(cfg))
     assert clip.width == 18 and clip.pot.height == 50
-    assert set(cfg.clip) - {"enable"} == set(Clip.__dataclass_fields__) - {"pot"}
+    assert set(cfg.clip) - {"enable"} == set(Clip.__dataclass_fields__) - {"pot"} - Clip.unused

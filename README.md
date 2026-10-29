@@ -216,8 +216,8 @@ height.
 
 **Hanging the pot:** tilt its bottom out a little, slide the back of the rim
 up into the hook, swing the bottom in over the ledge and let it down onto
-it. Take it off the same way backwards: lift it the 1.5 mm the hook
-allows, swing the bottom out, and drop it off the finger. The tests check
+it. Take it off the same way backwards: lift it as far as the hook
+allows (`holder.lift`), swing the bottom out, and drop it off the finger. The tests check
 that this works for every shape: the bottom swings out 4 to 6 degrees on a
 100 to 130 mm pot, and up to ~13 degrees on a 50 mm one.
 
@@ -230,12 +230,13 @@ holder needs a pot of at least ~40 mm.
 |---|---|---|
 | `holder.enable` | false | Also make the holder. |
 | `holder.screw` / `head` / `head_h` | 4 / 9 / 3 | The wall screws: shank and head diameter, head thickness. The plate is `head_h` + `clear` + 1.6 mm thick. |
-| `holder.clear` | 0.5 | Air between the holder and the pot, and around the screws. |
+| `holder.clear` | 0.2 | Air between the holder and the pot, and around the screws. 0 means the faces touch the pot (a press fit); 0.2 fits snugly. |
 | `holder.width` | 20 | Width across the back of the pot. At least ~15.6 mm (a counterbore and its teardrop roof), at most the pot's narrowest radius. |
 | `holder.thick` | 4 | Thickness of the bridge, the finger and the ledge. |
+| `holder.groove` | 3 | How deep the rim sits up in a groove under the bridge: the groove's outer side follows the outside of the rim, the finger its inside. At most `drop`. |
 | `holder.drop` | 6 | How far the finger reaches down inside the rim. |
 | `holder.ledge` | 6 | How far the ledge reaches in under the base. Longer means more bearing, but the pot has to swing further out to come off. |
-| `holder.lift` | 1.5 | Air above the rim: how far the pot lifts before it swings out. |
+| `holder.lift` | 0 | Air above the rim: how far the pot lifts before it swings out. 0 means the bridge lies on the rim. |
 
 ## Cup clip
 
@@ -254,8 +255,12 @@ all the way down, and a ledge reaches under the base. The ledge carries the
 pot. The pot's weight is in front of the ledge, so the pot tips forward and
 the finger inside the cup stops it. Everywhere the clip touches the cup, it
 presses `clip.squeeze` (0.3 mm) into it, so the cup wall sits tight in its
-slot. The two screws go in a tail below the ledge, under the pot, where you
-can reach them with the pot on.
+slot. The screws go through the clip behind the cup. Their counterbores
+open in the seat, so you drive them in from the front before the pot goes
+on, and the heads end up sunk behind the cup. They have to stay below the
+finger's tip, so a 130 mm pot has room for two, one above the other, and
+smaller pots for one. On pots under ~70 mm that one cuts a notch through the
+middle of the ledge, and the clip reaches a little below the ledge.
 
 **Hanging the pot:** tilt its bottom out, push the back of the cup wall up
 into the slot, and swing the bottom in over the ledge until it snaps in.

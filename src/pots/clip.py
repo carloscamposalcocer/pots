@@ -18,8 +18,13 @@ bottom out, push the back of the cup wall up into the slot, and swing the
 bottom in over the ledge; the lip pushes the hook back a little as it goes
 (about drop x the swing angle) and the clip springs back round it.
 
-The screws go in a tail below the ledge, under the pot, where they can be
-reached with the pot on.
+The screws go through the block behind the cup: their counterbores open in
+the seat, so they are driven from the front before the pot goes in, and the
+heads end up `clear` behind the cup. They have to stay below the finger's
+tip (a counterbore higher up would cut the finger), so a 130 mm pot has room
+for two, one above the other, and smaller ones for one; on pots under
+~70 mm it cuts a notch through the middle of the ledge, and the clip
+reaches a little below the ledge to keep FLOOR under it.
 
 Printability is the holder's: it prints on its side, every layer the same
 section, so there is no overhang; only the screw holes cross the layers,
@@ -30,9 +35,10 @@ from functools import cached_property
 
 import numpy as np
 
-from .holder import EDGE, SIDE, Holder
+from .holder import EDGE, FLOOR, SIDE, Holder
 
 FIN = 1.2          # thinnest finger (the moat between cup and pot)
+ABOVE = 0.5        # a counterbore stays this far below the finger's tip and above the ledge
 
 
 @dataclass(frozen=True)
@@ -44,12 +50,14 @@ class Clip(Holder):
     lift: float = 0.0         # air above the cup lip (0: the bridge lies on it)
     squeeze: float = 0.3      # how far the clip reaches into the cup wall, on each side: the grip
 
+    unused = {"groove"}       # Holder settings the clip ignores (its slot is the cup wall's shape)
+
     def __post_init__(self):
-        if min(self.screw, self.head, self.head_h, self.clear, self.width,
-               self.thick, self.drop, self.ledge) <= 0:
+        if min(self.screw, self.head, self.head_h, self.width, self.thick,
+               self.drop, self.ledge) <= 0:
             raise ValueError("every clip size must be positive")
-        if self.lift < 0:
-            raise ValueError("clip.lift can't be negative")
+        if min(self.clear, self.lift) < 0:
+            raise ValueError("clip.clear and clip.lift can't be negative")
         if not 0 <= self.squeeze <= 1:
             raise ValueError("clip.squeeze must be between 0 (no grip) and 1 mm")
         if self.head <= self.screw:
@@ -79,6 +87,10 @@ class Clip(Holder):
         return self.pot.cup_h + self.lift
 
     @property
+    def top(self):
+        return self.under + self.thick
+
+    @property
     def tip(self):
         """Lowest point of the finger."""
         return self.pot.cup_h - self.drop
@@ -98,17 +110,21 @@ class Clip(Holder):
         return min(self.thick, room)
 
     @property
-    def screw_hi(self):
-        """The screws go in a tail below the ledge, under the pot."""
-        return self.bottom - SIDE - self.sink / 2
+    def screws(self):
+        """Heights of the screws: two, one above the other, if they fit
+        between the ledge and the finger's tip, else one right under the tip."""
+        hi = self.tip - ABOVE - self.sink / 2
+        lo = hi - self.sink - SIDE
+        return (lo, hi) if lo - self.sink / 2 >= ABOVE else (hi,)
 
-    @property
-    def screw_lo(self):
-        return self.screw_hi - self.sink - SIDE
+    def sink_from(self, z):
+        """The counterbore starts inside the cup, so the head goes in from the front."""
+        return float(self.env(z - self.sink / 2)) - self.squeeze - 1
 
     @property
     def plate_bottom(self):
-        return self.screw_lo - self.sink / 2 - SIDE
+        """The clip's bottom: under the ledge, or lower if a counterbore reaches down there."""
+        return min(self.bottom, min(self.screws) - self.sink / 2 - FLOOR)
 
     def section(self):
         """The part's outline in the (u, z) plane: u from the pot axis toward
@@ -152,5 +168,6 @@ class Clip(Holder):
 
     def __str__(self):
         return (f"{self.width:.0f} mm wide, {self.top - self.plate_bottom:.0f} mm tall: a {self.drop:g} mm "
-                f"finger inside the cup, a {self.ledge:g} mm ledge, {self.squeeze:g} mm grip; two "
-                f"{self.screw:g} mm screws under the pot, the lip {self.standoff:.1f} mm off the wall")
+                f"finger inside the cup, a {self.ledge:g} mm ledge, {self.squeeze:g} mm grip; "
+                f"{['one', 'two'][len(self.screws) - 1]} {self.screw:g} mm screw{'s' * (len(self.screws) > 1)} "
+                f"behind the cup, the lip {self.standoff:.1f} mm off the wall")

@@ -41,7 +41,7 @@ EDGE = 1.0         # 45 deg break on the outside corners and the lead-ins
 GAP = 0.2          # extra air between the cup lip and the plate (keeps them from touching)
 SIDE = 2.0         # material between a screw head and the seat or the finger
 INTO = 0.5         # the section reaches this far into the pot, so the cut makes the face
-STEP = 0.25        # ... and the cut this far into the bridge, over the rim
+STEP = 0.25        # the bridge's top is `thick` - STEP above the rim
 ROOT2 = np.sqrt(2.0)
 
 
@@ -58,13 +58,16 @@ class Holder:
     drop: float = 6.0         # how far the finger reaches down inside the rim
     ledge: float = 6.0        # how far the ledge reaches in under the base
     lift: float = 1.5         # air above the rim: how far the pot lifts to come out
+    groove: float = 1.5       # how deep the rim sits up in a groove under the bridge (<= lift to swing out rigidly)
 
     printed = "on its side"
 
     def __post_init__(self):
-        if min(self.screw, self.head, self.head_h, self.clear, self.width,
-               self.thick, self.drop, self.ledge, self.lift) <= 0:
+        if min(self.screw, self.head, self.head_h, self.width, self.thick, self.groove,
+               self.drop, self.ledge) <= 0:
             raise ValueError("every holder size must be positive")
+        if min(self.clear, self.lift) < 0:
+            raise ValueError("holder.clear and holder.lift can't be negative (0: touching the pot)")
         if self.head <= self.screw:
             raise ValueError("holder.head must be wider than holder.screw")
         if self.screw_hi - self.screw_lo < self.sink + SIDE:
@@ -77,6 +80,8 @@ class Holder:
         if self.width > self.pot.r_min:
             raise ValueError(f"holder.width must be at most {self.pot.r_min:.0f} mm on this pot "
                              "(the plate is flat, it would wrap too far around it)")
+        if self.groove > self.drop:
+            raise ValueError("holder.groove can't be deeper than holder.drop")
         if self.drop > self.pot.height - self.pot.cup_h - 2 * self.thick:
             raise ValueError("holder.drop reaches down to the cup on this pot")
         if self.ledge >= self.env(0.0) - self.thick:
@@ -139,14 +144,16 @@ class Holder:
 
     @property
     def under(self):
-        """Underside of the bridge, beside the rim. Over the rim the cut takes
-        it STEP higher, to `lift` above it, so the finger has no ledge at its
-        root (and no face of the section lies in a face of the cut)."""
-        return self.pot.height + self.lift - STEP
+        """Underside of the bridge, beside the rim: `groove` below the top of
+        the rim's slot, so the rim sits in a groove between the finger and
+        the groove's outer side, which follows the outside of the rim. Over
+        the rim the cut takes it up to `lift` above the rim (no face of the
+        section lies in a face of the cut)."""
+        return self.pot.height + self.lift - self.groove
 
     @property
     def top(self):
-        return self.under + self.thick
+        return self.pot.height + self.lift - STEP + self.thick
 
     @property
     def tip(self):
@@ -169,6 +176,16 @@ class Holder:
     @property
     def screw_hi(self):
         return self.tip - self.sink / 2 - SIDE
+
+    @property
+    def screws(self):
+        """Heights of the screws."""
+        return (self.screw_lo, self.screw_hi)
+
+    def sink_from(self, z):
+        """Where the counterbore of the screw at height z starts (from the pot
+        side): the plate's front."""
+        return self.face - 3
 
     @property
     def min_height(self):
@@ -247,9 +264,9 @@ class Holder:
             return Manifold.extrude(sec, u1 - u0).rotate([0, 90, 0]).translate([u0, 0, 0])
 
         holes = []
-        for z in (self.screw_lo, self.screw_hi):
+        for z in self.screws:
             holes.append(teardrop(z, self.bore, self.face - 1, self.x_wall + 1))
-            holes.append(teardrop(z, self.sink, self.face - 3, self.face + self.head_h + self.clear))
+            holes.append(teardrop(z, self.sink, self.sink_from(z), self.face + self.head_h + self.clear))
         return Manifold.batch_boolean(holes, OpType.Add)
 
     def mesh(self, frame="print"):
