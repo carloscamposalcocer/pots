@@ -1,13 +1,54 @@
-"""Cup clip: a narrow strip whose hook has the shape of the back of the cup
-wall, holding the unchanged (tapered) pot by its cup, tight."""
+"""Wall clip: a printable part that fits the unchanged pot, and a way to
+get the pot in and out of it."""
 import numpy as np
 import pytest
-from test_holder import plain, pot_for
 
 from pots.cli import clip_from_config, load_config, pot_from_config
+from pots.geometry import SHAPES, Pot
 from pots.clip import Clip
-from pots.geometry import Pot
 from pots.metrics import overhang_share
+
+
+def plain(pot):
+    """The pot without its pattern (the clip never reaches the patterned band)."""
+    from manifold3d import Manifold
+
+    from pots.solid import _profile, _segments
+    return Manifold.revolve(_profile(pot), _segments(pot.r_max))
+
+
+def pot_for(h, shape):
+    return Pot(height=h, shape=shape, wall=6 if h > 60 else 4, skin=1.6, skin_frac=0.67)
+
+
+def place(clip, pot_m, lift, angle, slide, away):
+    """The pot moved out of the clip: lifted straight up, its bottom swung
+    out about the finger's tip by `angle` degrees, slid down its own (tilted)
+    axis and moved away from the wall."""
+    a = np.radians(angle)
+    f, tip = clip.finger, clip.tip
+    m = pot_m.translate([-f, 0, lift - tip]).rotate([0, angle, 0]).translate([f, 0, tip])
+    return m.translate([-slide * np.sin(a) - away, 0, -slide * np.cos(a)])
+
+
+def removal(clip, angle, frac, n=8):
+    """Poses taking the pot out: lift `frac` of the room above the rim, swing,
+    slide until the rim is clear of the finger, move away."""
+    lift, slide = clip.lift * frac, clip.drop + clip.lift + 0.5
+    return ([(lift * t, 0, 0, 0) for t in np.linspace(0, 1, 3)]
+            + [(lift, angle * t, 0, 0) for t in np.linspace(0, 1, n)[1:]]
+            + [(lift, angle, slide * t, 0) for t in np.linspace(0, 1, n)[1:]]
+            + [(lift, angle, slide, 20 * t) for t in np.linspace(0, 1, 4)[1:]])
+
+
+def swing_needed(clip, angles=np.arange(2, 21, 2.0)):
+    """The smallest swing (degrees) that gets the pot out without touching the clip."""
+    hm, pm = clip.manifold(), plain(clip.pot)
+    for angle in angles:
+        for frac in (0.3, 0.6, 0.9):
+            if all((hm ^ place(clip, pm, *p)).volume() < 0.01 for p in removal(clip, angle, frac)):
+                return angle
+    return None
 
 
 def check(clip):
@@ -15,37 +56,7 @@ def check(clip):
     assert m.is_watertight and m.body_count == 1
     assert overhang_share(m) == 0
     assert np.allclose(m.bounds[0], 0) and m.bounds[1][2] == pytest.approx(clip.width)
-    pot = plain(clip.pot)
-    assert (Clip(clip.pot, squeeze=0).manifold() ^ pot).volume() < 0.5    # touches, facets aside
-    assert (clip.manifold() ^ pot).volume() > 1.0                           # grips
-
-
-def give(clip, angles=np.arange(0, 21, 2.0)):
-    """How far (mm) the clip has to give for the pot to come out, on the best
-    swing: the deepest overlap of cup and clip in the centre section as the
-    bottom swings out about the finger's tip, slides down along the cup's
-    swung back wall and moves away (squeeze 0)."""
-    from pots.solid import _profile
-    p = clip.pot
-    clip = Clip(p, **{k: getattr(clip, k) for k in Clip.__dataclass_fields__ if k != "pot"} | {"squeeze": 0.0})
-    part, cup = clip.section() - clip.cutter(), _profile(p)
-    slant = np.degrees(np.arctan((p.cup_ri(p.cup_h) - p.cup_ri(0.0)) / p.cup_h))
-    f, tip, slide = clip.finger, clip.tip, clip.drop + clip.lift + 1.0
-
-    def depth(a, s, away):
-        b = np.radians(a + slant)
-        m = cup.translate([-f, -tip]).rotate(-a).translate([f - s * np.sin(b) - away, tip - s * np.cos(b)])
-        lo, hi = 0.0, 3.0
-        if (part ^ m).area() < 1e-4:
-            return 0.0
-        for _ in range(12):
-            d = (lo + hi) / 2
-            lo, hi = (lo, d) if (part.offset(-d) ^ m).area() < 1e-4 else (d, hi)
-        return hi
-
-    t = np.linspace(0, 1, 7)[1:]
-    return min(max([depth(a * u, 0, 0) for u in t] + [depth(a, slide * u, 0) for u in t]
-                   + [depth(a, slide, 15 * u) for u in t]) for a in angles)
+    assert (clip.manifold() ^ plain(clip.pot)).volume() < 1e-3      # clear of the pot
 
 
 @pytest.mark.parametrize("h", [50, 100])
@@ -54,71 +65,53 @@ def test_clip_fits(h):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("h", [65, 130])
-def test_clip_fits_other_sizes(h):
-    check(Clip(pot_for(h, "tapered")))
+@pytest.mark.parametrize("shape", SHAPES)
+@pytest.mark.parametrize("h", [50, 65, 130])
+def test_clip_fits_every_shape(h, shape):
+    clip = Clip(pot_for(h, shape))
+    check(clip)
+    assert swing_needed(clip) is not None
 
 
 def test_clip_holds():
-    """The ledge is under the base, the finger inside the cup (clear of the
-    pot wall), the bridge on the lip, the back behind the cup, the screws below."""
+    """The ledge is under the back of the base, the finger inside the rim,
+    and the plate behind the pot; the pot touches none of them."""
     clip = Clip(pot_for(100, "tapered"))
-    p = clip.pot
+    pot = clip.pot
     from manifold3d import Manifold
     m = clip.manifold()
     dot = Manifold.cube([0.2] * 3, center=True)
-    lip = float(clip.env(p.cup_h))
-    inside = np.array([(m ^ dot.translate(q)).volume() > 0.007 for q in [
-        [float(clip.env(0.0)) - clip.ledge / 2, 0, -1],                  # ledge, under the base
-        [float(clip.ri(clip.tip + 1)) - clip.fin / 2, 0, clip.tip + 1],  # finger, inside the cup
-        [lip - 1, 0, clip.top - 1],                                      # bridge, on the lip
-        [lip + 0.5, 0, p.cup_h - 1],                                     # back, behind the lip
-        [clip.x_wall - 1, 0, clip.top - 1],                              # plate, by the bridge
+    inside = np.array([(m ^ dot.translate(p)).volume() > 0.007 for p in [
+        [float(clip.env(0.0)) - clip.ledge / 2, 0, -1],             # ledge, under the base
+        [clip.finger - clip.thick / 2, 0, pot.height - 2],         # finger, inside the rim
+        [float(pot.r_out(pot.height)) + 1, 0, clip.top - 1],         # bridge, over the rim
+        [clip.x_wall - 1, 0, pot.height / 2],                        # plate
     ]])
     assert inside.all()
-    assert clip.finger > float(p.cup_ri(clip.tip))                       # squeezes the cup's inside
-    assert clip.ri(p.cup_h) - clip.fin > float(p.r_out(p.cup_h)) + clip.clear   # clear of the pot wall
-    assert clip.under == p.cup_h
-
-
-@pytest.mark.parametrize("h, n", [(50, 1), (100, 1), (130, 2)])
-def test_clip_screws(h, n):
-    """The screws go through the clip behind the cup, below the finger's tip:
-    the counterbores open in the seat, the heads sit behind the cup, and
-    everything the pot touches is left whole."""
-    clip = Clip(pot_for(h, "tapered"))
-    assert len(clip.screws) == n
-    assert max(clip.screws) + clip.sink / 2 < clip.tip
-    assert clip.plate_bottom <= min(clip.screws) - clip.sink / 2 - 1.5
-    head = clip.face + clip.clear                # front of a sunk screw head
-    assert head > float(clip.env(clip.pot.cup_h)) + clip.clear
-    from manifold3d import Manifold
-    m = clip.manifold()
-    for z in clip.screws:                         # the hole goes through to the wall
-        assert (m ^ Manifold.cube([clip.x_wall + 1, 0.5, 0.5]).translate([0, -0.25, z - 0.25])).volume() < 1e-6
+    assert clip.finger < float(pot.r_in(pot.height)) - clip.clear + 1e-9
+    assert clip.face > clip.env_max + clip.clear
 
 
 @pytest.mark.parametrize("h", [50, 100])
-def test_pot_snaps_in(h):
-    """The pot goes in and out with a swing of the bottom if the clip gives
-    less than a millimetre (a press fit: the slot is the cup wall's shape)."""
-    assert give(Clip(pot_for(h, "tapered"))) < (1.0 if h < 80 else 0.7)
+def test_pot_comes_out(h):
+    """The pot comes out with a modest swing of the bottom (and goes in the same way back)."""
+    assert swing_needed(Clip(pot_for(h, "tapered"))) <= (14 if h < 60 else 8)
 
 
 def test_clip_bad_settings():
     pot = pot_for(100, "tapered")
     with pytest.raises(ValueError, match="width must be at least"):
         Clip(pot, width=10)
+    with pytest.raises(ValueError, match="positive"):
+        Clip(pot, groove=0)
+    with pytest.raises(ValueError, match="deeper than"):
+        Clip(pot, groove=7)
     with pytest.raises(ValueError, match="negative"):
         Clip(pot, clear=-0.1)
-    with pytest.raises(ValueError, match="squeeze"):
-        Clip(pot, squeeze=-0.1)
     with pytest.raises(ValueError, match="wider than"):
         Clip(pot, head=3)
-    with pytest.raises(ValueError, match="too far down"):
-        Clip(pot, drop=20)
-    with pytest.raises(ValueError, match="finger doesn't fit"):
-        Clip(Pot(height=40, shape="straight", wall=4), width=16)    # a ~1.5 mm moat
+    with pytest.raises(ValueError, match="too short"):
+        Clip(Pot(height=20, wall=3))
 
 
 def test_clip_config():
@@ -127,4 +120,4 @@ def test_clip_config():
     cfg = load_config(["clip.enable=true", "clip.width=18", "size=small"])
     clip = clip_from_config(cfg, pot_from_config(cfg))
     assert clip.width == 18 and clip.pot.height == 50
-    assert set(cfg.clip) - {"enable"} == set(Clip.__dataclass_fields__) - {"pot"} - Clip.unused
+    assert set(cfg.clip) - {"enable"} == set(Clip.__dataclass_fields__) - {"pot"}

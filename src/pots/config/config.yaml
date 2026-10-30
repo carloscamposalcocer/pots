@@ -109,17 +109,17 @@ design:
   skin_frac: 0.67
 
 # ---------------------------------------------------------------------
-# holder: a separate part that hangs the pot on a wall, nothing on the
+# clip: a separate part that hangs the pot on a wall, nothing on the
 # pot changes. A plate screwed to the wall, a hook over the back of the
 # rim with a finger inside it, and a seat that hugs the back of the cup
 # with a ledge under the base. With it on, the run also writes
-# <name>_holder.stl / .3mf, lying in its print orientation (on its side,
+# <name>_clip.stl / .3mf, lying in its print orientation (on its side,
 # no supports).
 # To hang the pot: tilt the bottom out, slide the back of the rim up into
 # the hook, swing the bottom in over the ledge and let it down.
 # ---------------------------------------------------------------------
-holder:
-  # enable: also make the holder. Off by default.
+clip:
+  # enable: also make the clip. Off by default.
   enable: false
 
   # The wall screws you will use: shank diameter, head diameter and head
@@ -129,12 +129,12 @@ holder:
   head: 9.0
   head_h: 3.0
 
-  # Air between the holder and the pot (mm), and around the screws.
+  # Air between the clip and the pot (mm), and around the screws.
   # 0: the faces touch the pot exactly (a press fit); 0.2 fits snugly
   # and still lets the screws through.
   clear: 0.2
 
-  # How wide the holder is, across the back of the pot (mm). It has to
+  # How wide the clip is, across the back of the pot (mm). It has to
   # hold a counterbore with its teardrop roof (about 15 mm with the
   # default screws).
   width: 20.0
@@ -145,7 +145,7 @@ holder:
   # How deep the rim sits up in a groove under the bridge (mm): the
   # groove's outer side follows the outside of the rim, the finger its
   # inside. Deeper holds the rim tighter; at most `drop`. Deeper than
-  # `lift` and the pot can only come out by flexing the holder.
+  # `lift` and the pot can only come out by flexing the clip.
   groove: 3.0
 
   # How far the finger reaches down inside the rim (mm): it is what
@@ -160,58 +160,5 @@ holder:
   # Air above the rim (mm): how far the pot lifts before it swings out.
   # 0: the bridge lies on the rim.
   lift: 0.0
-
-# ---------------------------------------------------------------------
-# clip: another way to hang the pot on a wall, holding it by the cup
-# alone, nothing on the pot changes (made for the tapered pot). A narrow
-# strip (`width`, 20 mm): a plate on the wall and a hook whose inside has
-# the shape of the back of the cup wall: a finger down inside the cup
-# (between the cup and the pot wall), a bridge on the lip, the back
-# following the outside of the cup, and a ledge under the base. It
-# presses `squeeze` into the cup everywhere it touches, so the cup sits
-# tight. The screws go through it behind the cup (two on a 130 mm pot,
-# one on smaller ones), driven before the pot goes on. With it on, the run
-# also writes <name>_clip.stl / .3mf, lying in its print orientation (on
-# its side, no supports).
-# To hang the pot: tilt the bottom out, push the back of the cup wall up
-# into the slot and swing the bottom in over the ledge: it snaps in (the
-# clip gives ~0.5 mm on a 100 mm pot). Off is the same backwards.
-# ---------------------------------------------------------------------
-clip:
-  # enable: also make the clip. Off by default.
-  enable: false
-
-  # The wall screws: shank diameter, head diameter and head thickness
-  # (mm). The heads sink into counterbores that open in the seat, behind
-  # the cup.
-  screw: 3.5
-  head: 6.0
-  head_h: 3.0
-
-  # Air between the finger and the pot wall, and around the screws (mm).
-  clear: 0.5
-
-  # How wide the strip is (mm). At least ~15.6 (a counterbore and its
-  # teardrop roof), at most the pot's narrowest radius.
-  width: 20.0
-
-  # Thickness of the bridge, the ledge and the finger (mm). Where the
-  # moat between cup and pot is narrower, the finger gets thinner, down
-  # to 1.2 mm.
-  thick: 3.0
-
-  # How far the finger reaches down inside the cup (mm). Longer holds
-  # better, but the snap gets stiffer.
-  drop: 4.0
-
-  # How far the ledge reaches in under the base (mm): it carries the pot.
-  ledge: 3.0
-
-  # Air above the cup lip (mm). 0: the bridge lies on the lip.
-  lift: 0.0
-
-  # How far the clip presses into the cup wall on each side (mm): the
-  # grip. 0 = a snug fit with no grip.
-  squeeze: 0.3
 
 # Pattern settings (cell size, strut widths, ...): config/patterns.yaml.

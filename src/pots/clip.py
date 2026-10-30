@@ -1,173 +1,274 @@
 """
-Cup clip (clip.enable): one narrow printed part that holds an unchanged pot
-against the wall by its cup alone, tight. Made for the standard tapered pot.
+Wall clip (clip.enable): one separate printed part that holds an
+unchanged pot against the wall.
 
-It is a strip at most `width` mm wide: a back plate on the wall, and a hook
-whose inside has the shape of the back of the cup wall. The finger follows
-the inside of the cup down `drop` mm (in the moat between the cup and the
-pot wall), the bridge lies on the lip, the back follows the outside of the
-cup all the way down, and a ledge reaches `ledge` mm in under the base. The
-ledge carries the pot; the pot's weight is in front of it, so the pot tips
-forward and the finger inside the cup stops it. Every face that touches the
-cup reaches `squeeze` mm into it (the bridge just touches the lip, `lift`
-above it), so the cup wall is held in a tight slot.
+A back plate is screwed to the wall. At its top a bridge reaches over the
+rim, and a finger hangs `drop` mm down inside it; at its bottom a seat hugs
+the back of the cup, with a ledge `ledge` mm under the base. The ledge
+carries the pot. The pot's weight sits on its axis, in front of the ledge,
+so the pot wants to tip forward: the finger stops that by holding the rim
+in, and the seat takes the matching push of the cup back against the plate.
 
-Because the slot follows the cup wall exactly, the pot can't swing in or
-out without something giving: it is a press fit. Hanging the pot: tilt the
-bottom out, push the back of the cup wall up into the slot, and swing the
-bottom in over the ledge; the lip pushes the hook back a little as it goes
-(about drop x the swing angle) and the clip springs back round it.
+Everything that touches the pot follows its surface: the part is drawn as
+a section in the plane through the pot's axis, extruded `width` mm across,
+and then the pot itself, grown by `clear`, is cut out of it (revolved, so
+the faces curve round the pot). Every size comes from the Pot, so the
+clip fits any shape and height.
 
-The screws go through the block behind the cup: their counterbores open in
-the seat, so they are driven from the front before the pot goes in, and the
-heads end up `clear` behind the cup. They have to stay below the finger's
-tip (a counterbore higher up would cut the finger), so a 130 mm pot has room
-for two, one above the other, and smaller ones for one; on pots under
-~70 mm it cuts a notch through the middle of the ledge, and the clip
-reaches a little below the ledge to keep FLOOR under it.
+Taking the pot out: lift it (there is `lift` mm of air above the rim), swing
+the bottom out about the finger's tip until it is past the ledge, slide it
+down its own tilted axis off the finger and away. Putting it in is the same
+backwards. The finger's outer face is vertical, inside the narrowest part
+of the rim it passes, so the rim slides up and down past it whatever the
+shape leans; the tests check this path for every shape (a swing of 4 to 6
+degrees on the 100 to 130 mm pots, more on small ones).
 
-Printability is the holder's: it prints on its side, every layer the same
-section, so there is no overhang; only the screw holes cross the layers,
-with teardrop roofs.
+Printability. The part prints lying on its side (the section flat on the
+bed): every layer is the same section, so there is no overhang at all,
+except the two screw holes, which run across the layers and get a
+teardrop roof (45 degrees). The screw heads are sunk into counterbores in
+the plate's front, behind the pot.
 """
 from dataclasses import dataclass
 from functools import cached_property
 
 import numpy as np
 
-from .holder import EDGE, FLOOR, SIDE, Holder
+from .geometry import Pot
 
-FIN = 1.2          # thinnest finger (the moat between cup and pot)
-ABOVE = 0.5        # a counterbore stays this far below the finger's tip and above the ledge
+FLOOR = 1.6        # plate left behind a sunk screw head
+EDGE = 1.0         # 45 deg break on the outside corners and the lead-ins
+GAP = 0.2          # extra air between the cup lip and the plate (keeps them from touching)
+SIDE = 2.0         # material between a screw head and the seat or the finger
+INTO = 0.5         # the section reaches this far into the pot, so the cut makes the face
+STEP = 0.25        # the bridge's top is `thick` - STEP above the rim
+ROOT2 = np.sqrt(2.0)
 
 
 @dataclass(frozen=True)
-class Clip(Holder):
-    """A cup clip for one pot (a Holder that hooks the cup instead of the rim)."""
-    thick: float = 3.0        # thickness of the bridge and the ledge, and of the finger where the moat allows
-    drop: float = 4.0         # how far the finger reaches down inside the cup
-    ledge: float = 3.0        # how far the ledge reaches in under the base
-    lift: float = 0.0         # air above the cup lip (0: the bridge lies on it)
-    squeeze: float = 0.3      # how far the clip reaches into the cup wall, on each side: the grip
-
-    unused = {"groove"}       # Holder settings the clip ignores (its slot is the cup wall's shape)
+class Clip:
+    """A wall clip for one pot."""
+    pot: Pot
+    screw: float = 4.0        # wall screw shank diameter
+    head: float = 9.0         # wall screw head diameter
+    head_h: float = 3.0       # wall screw head thickness
+    clear: float = 0.5        # air between the clip and the pot, and around the screws
+    width: float = 20.0       # how wide the clip is, across the pot
+    thick: float = 4.0        # thickness of the bridge, the finger and the ledge
+    drop: float = 6.0         # how far the finger reaches down inside the rim
+    ledge: float = 6.0        # how far the ledge reaches in under the base
+    lift: float = 1.5         # air above the rim: how far the pot lifts to come out
+    groove: float = 1.5       # how deep the rim sits up in a groove under the bridge (<= lift to swing out rigidly)
 
     def __post_init__(self):
-        if min(self.screw, self.head, self.head_h, self.width, self.thick,
+        if min(self.screw, self.head, self.head_h, self.width, self.thick, self.groove,
                self.drop, self.ledge) <= 0:
             raise ValueError("every clip size must be positive")
         if min(self.clear, self.lift) < 0:
-            raise ValueError("clip.clear and clip.lift can't be negative")
-        if not 0 <= self.squeeze <= 1:
-            raise ValueError("clip.squeeze must be between 0 (no grip) and 1 mm")
+            raise ValueError("clip.clear and clip.lift can't be negative (0: touching the pot)")
         if self.head <= self.screw:
             raise ValueError("clip.head must be wider than clip.screw")
+        if self.screw_hi - self.screw_lo < self.sink + SIDE:
+            raise ValueError(f"the pot is too short for the clip: there is no room for two "
+                             f"screws between the cup and the finger (height >= "
+                             f"{self.min_height:.0f} mm)")
         if self.width < self.min_width:
             raise ValueError(f"clip.width must be at least {self.min_width:.1f} mm "
                              "(the counterbore and its teardrop roof)")
         if self.width > self.pot.r_min:
             raise ValueError(f"clip.width must be at most {self.pot.r_min:.0f} mm on this pot "
                              "(the plate is flat, it would wrap too far around it)")
-        if self.tip < self.thick:
-            raise ValueError("clip.drop reaches too far down the cup")
-        if self.fin < FIN:
-            raise ValueError(f"the finger doesn't fit inside the cup on this pot (it would be "
-                             f"{self.fin:.1f} mm thick): make clip.drop or clip.clear smaller")
+        if self.groove > self.drop:
+            raise ValueError("clip.groove can't be deeper than clip.drop")
+        if self.drop > self.pot.height - self.pot.cup_h - 2 * self.thick:
+            raise ValueError("clip.drop reaches down to the cup on this pot")
         if self.ledge >= self.env(0.0) - self.thick:
             raise ValueError("clip.ledge reaches past the middle of the base")
 
+    # ------------------------------------------------------------ the pot
+    def env(self, z):
+        """Outer radius of the pot at height z: the body, or the cup where it is wider."""
+        p = self.pot
+        r = p.r_out(z)
+        cup = np.where(np.asarray(z) <= p.cup_h, p.cup_ri(z) + p.cup_wall, 0.0)
+        return np.maximum(r, cup)
+
+    @cached_property
+    def env_max(self):
+        z = np.linspace(0, self.pot.height, 2000)
+        return float(self.env(z).max())
+
     # ------------------------------------------------------------ the part
-    def ri(self, z):
-        """Inner radius of the cup at height z (constant above the lip)."""
-        return self.pot.cup_ri(np.clip(z, 0, self.pot.cup_h))
+    @property
+    def bore(self):
+        return self.screw + self.clear
+
+    @property
+    def sink(self):
+        """Counterbore diameter."""
+        return self.head + self.clear
+
+    @property
+    def min_width(self):
+        return self.sink * ROOT2 + 2 * EDGE
+
+    @cached_property
+    def plate(self):
+        """Back plate thickness: a sunk screw head plus the floor under it."""
+        return FLOOR + self.head_h + self.clear
+
+    @cached_property
+    def face(self):
+        """Distance from the pot axis to the plate's front face."""
+        return self.env_max + self.clear + GAP
+
+    @cached_property
+    def x_wall(self):
+        """Distance from the pot axis to the wall."""
+        return self.face + self.plate
+
+    @property
+    def standoff(self):
+        """Gap between the pot and the wall."""
+        return self.x_wall - self.env_max
+
+    @property
+    def bottom(self):
+        return -self.thick
 
     @property
     def under(self):
-        """Underside of the bridge: on the lip, or `lift` above it."""
-        return self.pot.cup_h + self.lift
+        """Underside of the bridge, beside the rim: `groove` below the top of
+        the rim's slot, so the rim sits in a groove between the finger and
+        the groove's outer side, which follows the outside of the rim. Over
+        the rim the cut takes it up to `lift` above the rim (no face of the
+        section lies in a face of the cut)."""
+        return self.pot.height + self.lift - self.groove
 
     @property
     def top(self):
-        return self.under + self.thick
+        return self.pot.height + self.lift - STEP + self.thick
 
     @property
     def tip(self):
         """Lowest point of the finger."""
-        return self.pot.cup_h - self.drop
-
-    @property
-    def finger(self):
-        """Radius of the finger's outer face at its tip (it follows the cup up from there)."""
-        return float(self.ri(self.tip)) + self.squeeze
+        return self.pot.height - self.drop
 
     @cached_property
-    def fin(self):
-        """Finger thickness inside the cup wall: `thick`, or less where the
-        moat between the cup and the pot wall is narrower (`clear` left on
-        the pot side)."""
-        z = np.linspace(self.tip, self.top, 200)
-        room = float(np.min(self.ri(z) - self.pot.r_out(z))) - self.clear
-        return min(self.thick, room)
+    def finger(self):
+        """Radius of the finger's outer face: vertical, `clear` inside the
+        narrowest part of the rim it sees as the pot lifts `lift` and drops
+        off it, so the rim slides straight up and down past it whatever the
+        shape leans."""
+        z = np.linspace(self.tip - self.lift, self.pot.height, 200)
+        return float(self.pot.r_in(z).min()) - self.clear
 
     @property
-    def screws(self):
-        """Heights of the screws: two, one above the other, if they fit
-        between the ledge and the finger's tip, else one right under the tip."""
-        hi = self.tip - ABOVE - self.sink / 2
-        lo = hi - self.sink - SIDE
-        return (lo, hi) if lo - self.sink / 2 >= ABOVE else (hi,)
-
-    def sink_from(self, z):
-        """The counterbore starts inside the cup, so the head goes in from the front."""
-        return float(self.env(z - self.sink / 2)) - self.squeeze - 1
+    def screw_lo(self):
+        return self.pot.cup_h + self.sink / 2 + SIDE
 
     @property
-    def plate_bottom(self):
-        """The clip's bottom: under the ledge, or lower if a counterbore reaches down there."""
-        return min(self.bottom, min(self.screws) - self.sink / 2 - FLOOR)
+    def screw_hi(self):
+        return self.tip - self.sink / 2 - SIDE
+
+    @property
+    def min_height(self):
+        """Shortest pot (same proportions) with room for both screws."""
+        from .geometry import CUP_H_REF, H_REF
+        need = self.drop + 2 * self.sink + 3 * SIDE
+        return need / (1 - CUP_H_REF / H_REF)
 
     def section(self):
         """The part's outline in the (u, z) plane: u from the pot axis toward
-        the wall, z up from the pot's bed. A plate and one block from the
-        ledge's tip to the plate; `cutter` carves the cup's shape out of it."""
+        the wall, z up from the pot's bed. Where it overlaps the pot (+ clear)
+        it is cut back by `cutter`."""
         from manifold3d import CrossSection
 
         from .solid import _ccw
-        e = EDGE
-        f, w, B, T, P = self.face, self.x_wall, self.bottom, self.top, self.plate_bottom
-        plate = [(f, P), (w - e, P), (w, P + e), (w, T - e), (w - e, T), (f, T)]
-        # the ledge's front edge crosses z = 0 one EDGE in, so it gets a lead-in
-        lo = float(self.env(0.0)) - self.ledge
-        block = [(lo, B + e), (lo + e, B), (f, B), (f, T), (lo + 1.5 * e, T),
-                 (lo + 1.5 * e, 0.5 * e), (lo, -0.5 * e)]
-        return CrossSection([_ccw(q) for q in (plate, block)])
+        p, e, t = self.pot, EDGE, self.thick
+        f, w, B, U, T = self.face, self.x_wall, self.bottom, self.under, self.top
+        plate = [(f, B), (w - e, B), (w, B + e), (w, T - e), (w - e, T), (f, T)]
+        # bridge + finger: the finger's outer side is drawn INTO mm into the
+        # rim, the cut makes the real face (round the pot, `clear` off it),
+        # with a lead-in on the tip
+        r, tip = self.finger, self.tip
+        hook = [(f, U), (r + INTO, U), (r + INTO, tip + e + INTO), (r - e, tip), (r - t + e, tip),
+                (r - t, tip + e), (r - t, T - e), (r - t + e, T), (f, T)]
+        # seat: a block under and behind the cup; the cut leaves the ledge
+        # under the base and the face following the cup. Its front edge
+        # crosses z = 0 one EDGE in, so the ledge gets a lead-in.
+        lo = self.env(0.0) - self.ledge
+        seat = [(lo, B + e), (lo + e, B), (f, B), (f, p.cup_h - GAP), (lo + 1.5 * e, p.cup_h - GAP),
+                (lo + 1.5 * e, 0.5 * e), (lo, -0.5 * e)]
+        return CrossSection([_ccw(s) for s in (plate, hook, seat)])
 
     def cutter(self):
-        """The back of the cup wall as a revolved (r, z) section, `squeeze`
-        thinner on each side: the whole cup below the finger (the seat and
-        the ledge follow it), and above the finger's tip only the wall
-        itself and what lies inside the finger, up past the bridge."""
+        """The pot grown by `clear`, as a revolved (r, z) section: solid
+        below the finger, and out from the finger's face up where it is."""
         from manifold3d import CrossSection
 
         from .solid import _ccw
-        p, s, t = self.pot, self.squeeze, self.fin
-        k = min(EDGE, t / 3)                    # lead-ins on the finger's tip
-        tip, top = self.tip, self.under
-        zs = np.linspace(0, p.cup_h, int(np.ceil(p.cup_h / 0.25)) + 1)
-        up = zs[zs > tip + k]
-        ri = lambda z: float(self.ri(z))
-        lip = float(self.env(p.cup_h)) - s
-        pts = ([(0.0, 0.0)] + [(float(self.env(z)) - s, z) for z in zs]
-               + ([(lip, top)] if top > p.cup_h else [])
-               + [(ri(p.cup_h) + s, top)] + [(ri(z) + s, z) for z in up[::-1]]
-               + [(ri(tip + k) + s, tip + k), (ri(tip) + s - k, tip),            # the finger's tip
-                  (ri(tip) - t + k, tip), (ri(tip + k) - t, tip + k)]
-               + [(ri(z) - t, z) for z in up]
-               + [(ri(p.cup_h) - t, self.top + 1), (0.0, self.top + 1)])
+        p, c = self.pot, self.clear
+        z_mid = (p.cup_h + self.tip) / 2
+        zs = np.linspace(0, p.height, int(np.ceil(p.height / 0.25)) + 1)
+        zs = np.union1d(zs, [p.cup_h, np.nextafter(p.cup_h, np.inf)])
+        top = p.height + self.lift
+        pts = ([(0.0, 0.0)] + [(float(self.env(z)) + c, z) for z in zs]
+               + [(float(self.env(p.height)) + c, top), (self.finger, top),
+                  (self.finger, z_mid), (0.0, z_mid)])
         return CrossSection([_ccw(pts)])
 
+    def manifold(self):
+        """The clip in the pot's frame: the plate at +x, z up, centred on y = 0."""
+        from manifold3d import Manifold
+
+        from .solid import _segments
+        W = self.width
+        body = Manifold.extrude(self.section(), W)        # section in (x, y), across along z
+        body = body - self._bores()
+        body = body.rotate([90, 0, 0]).translate([0, W / 2, 0])   # (u, z, across) -> (x, y, z)
+        n = _segments(self.x_wall)
+        return body - Manifold.revolve(self.cutter(), n)
+
+    def _bores(self):
+        """The two screw holes and their counterbores, across the layers of the
+        print frame (u, z, across), each with a teardrop roof."""
+        from manifold3d import CrossSection, Manifold, OpType
+
+        from .solid import _ccw
+        W = self.width
+
+        def teardrop(z, dia, u0, u1):
+            r = dia / 2
+            a = np.deg2rad(np.linspace(135, 405, 48))
+            pts = [(0.0, r * ROOT2)] + list(zip(r * np.cos(a), r * np.sin(a)))
+            # (z, across) of the hole -> section (a, b) = (-across, z) so the
+            # extrusion, turned onto u, puts the point up (+across)
+            sec = CrossSection([_ccw([(-(W / 2 + y), z + x) for x, y in pts])])
+            return Manifold.extrude(sec, u1 - u0).rotate([0, 90, 0]).translate([u0, 0, 0])
+
+        holes = []
+        for z in (self.screw_lo, self.screw_hi):
+            holes.append(teardrop(z, self.bore, self.face - 1, self.x_wall + 1))
+            holes.append(teardrop(z, self.sink, self.face - 3, self.face + self.head_h + self.clear))
+        return Manifold.batch_boolean(holes, OpType.Add)
+
+    def mesh(self, frame="print"):
+        """The clip as a trimesh. frame="print": lying on its side, the
+        section flat on the bed; frame="pot": mounted, in the pot's frame."""
+        import trimesh
+        m = self.manifold()
+        if frame == "print":
+            m = m.translate([0, -self.width / 2, 0]).rotate([-90, 0, 0])
+            lo = np.asarray(m.bounding_box()[:3])
+            m = m.translate(-lo)
+        elif frame != "pot":
+            raise ValueError(f"unknown frame '{frame}'")
+        g = m.to_mesh()
+        return trimesh.Trimesh(g.vert_properties[:, :3], g.tri_verts, process=True)
+
     def __str__(self):
-        return (f"{self.width:.0f} mm wide, {self.top - self.plate_bottom:.0f} mm tall: a {self.drop:g} mm "
-                f"finger inside the cup, a {self.ledge:g} mm ledge, {self.squeeze:g} mm grip; "
-                f"{['one', 'two'][len(self.screws) - 1]} {self.screw:g} mm screw{'s' * (len(self.screws) > 1)} "
-                f"behind the cup, the lip {self.standoff:.1f} mm off the wall")
+        return (f"a {self.width:.0f} mm wide clip, {self.top - self.bottom:.0f} mm tall: "
+                f"two {self.screw:g} mm screws {self.screw_hi - self.screw_lo:.0f} mm apart, the "
+                f"pot {self.standoff:.1f} mm off the wall, sitting on a {self.ledge:g} mm ledge "
+                f"with a {self.drop:g} mm finger inside the rim")

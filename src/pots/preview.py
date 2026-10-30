@@ -230,8 +230,8 @@ def render(mesh, field, pot, path, title):
     log.info("preview saved %s in %.1f s", path, time.perf_counter() - t0)
 
 
-HOLDER = np.array([0.36, 0.45, 0.52])         # rendered wall holder (slate, so it reads apart from the pot)
-HOLDER_HEX, WALL_HEX = "#5c7385", "#b9b0a8"
+CLIP = np.array([0.36, 0.45, 0.52])           # rendered wall clip (slate, so it reads apart from the pot)
+CLIP_HEX, WALL_HEX = "#5c7385", "#b9b0a8"
 
 
 def draw_meshes(ax, parts, elev, azim, px=700, pad=4):
@@ -266,41 +266,41 @@ def centre_section(mesh):
     return [np.asarray(r) for r in m.rotate([-90, 0, 0]).slice(0.0).to_polygons()]
 
 
-def render_holder(mesh, holder, path, title):
-    """A wall holder (holder.Holder or clip.Clip): holding the pot (seen from
-    behind, beside the wall), a section through both on the holder's centre
-    line, and the part alone as it stands on the bed."""
+def render_clip(mesh, clip, path, title):
+    """The wall clip: holding the pot (seen from behind, beside the wall),
+    a section through both on the clip's centre line, and the part alone
+    as it lies on the bed."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     t0 = time.perf_counter()
-    mounted = holder.mesh("pot")
+    mounted = clip.mesh("pot")
     fig = plt.figure(figsize=(16, 7), facecolor="white")
     ax = fig.add_subplot(1, 3, 1)
-    draw_meshes(ax, [(mesh, CLAY), (mounted, HOLDER)], 18, 35); style(ax, "Holding the pot (from behind)")
+    draw_meshes(ax, [(mesh, CLAY), (mounted, CLIP)], 18, 35); style(ax, "Holding the pot (from behind)")
 
     ax = fig.add_subplot(1, 3, 2)
     from matplotlib.patches import PathPatch
     from matplotlib.path import Path as MPath
-    for m, c in ((mesh, CLAY_HEX), (mounted, HOLDER_HEX)):
+    for m, c in ((mesh, CLAY_HEX), (mounted, CLIP_HEX)):
         rings = centre_section(m)
         if rings:   # outer rings counter-clockwise, holes clockwise: the nonzero rule fills it right
             verts = np.vstack([np.vstack([r, r[:1]]) for r in rings])
             codes = np.concatenate([[MPath.MOVETO] + [MPath.LINETO] * (len(r) - 1) + [MPath.CLOSEPOLY]
                                     for r in rings])
             ax.add_patch(PathPatch(MPath(verts, codes), facecolor=c, lw=0))
-    ax.axvline(holder.x_wall, color=WALL_HEX, lw=6)
-    x0 = holder.env(0.0) - holder.ledge - 12
-    ax.set_xlim(x0, holder.x_wall + 6); ax.set_ylim(holder.plate_bottom - 4, holder.top + 4)
+    ax.axvline(clip.x_wall, color=WALL_HEX, lw=6)
+    x0 = clip.env(0.0) - clip.ledge - 12
+    ax.set_xlim(x0, clip.x_wall + 6); ax.set_ylim(clip.bottom - 4, clip.top + 4)
     ax.set_aspect("equal"); ax.tick_params(colors=MUTED)
     style(ax, "Section on the centre line (mm, wall at right)")
 
     ax = fig.add_subplot(1, 3, 3)
-    draw_meshes(ax, [(holder.mesh(), HOLDER)], 40, -60); style(ax, f"As printed ({holder.printed})")
-    fig.suptitle(f"{title}\n{holder}", fontsize=13, color=INK)
+    draw_meshes(ax, [(clip.mesh(), CLIP)], 40, -60); style(ax, "Clip as printed (on its side)")
+    fig.suptitle(f"{title}\n{clip}", fontsize=13, color=INK)
     plt.tight_layout(); plt.savefig(path, dpi=85); plt.close(fig)
-    log.info("holder preview saved %s in %.1f s", path, time.perf_counter() - t0)
+    log.info("clip preview saved %s in %.1f s", path, time.perf_counter() - t0)
 
 
 def render_card(mesh, field, pot, path, title):
