@@ -61,6 +61,7 @@ Written to `out` (default `output/<pattern>_<shape>_h<height>/`):
 | `<pattern>_<shape>_h<height>.png` | preview: outside, cut-away, vertical section, both wall faces at true scale with their open % |
 | `<pattern>_<shape>_h<height>_clip.stl` / `.3mf` | with `clip.enable=true`: the wall clip, a separate part, lying in its print orientation |
 | `<pattern>_<shape>_h<height>_clip.png` | with `clip.enable=true`: the clip on the pot, a section through both, the part as printed |
+| `<pattern>_<shape>_h<height>_clip_drawing.png` | with `clip.enable=true`: the clip's dimensioned drawing, each size labelled with its `clip.*` setting |
 | `config.yaml` | the exact settings used for this pot |
 
 ## Parameters
@@ -224,6 +225,12 @@ section, and only the two screw holes cross the layers, so they get
 teardrop roofs. Pots under ~46 mm need a narrower `clip.width`; the
 clip needs a pot of at least ~40 mm.
 
+Every size of the clip, labelled with the setting that controls it (the
+100 mm pot with the default settings; with `clip.enable=true` each run
+writes this drawing for its own pot as `<name>_clip_drawing.png`):
+
+![clip drawing](docs/clip_drawing.png)
+
 | Key | Default | Description |
 |---|---|---|
 | `clip.enable` | false | Also make the clip. |
@@ -328,6 +335,7 @@ tests/          pytest suite (uv run pytest)
 docs/patterns/  gallery images used in this README (pots-gallery)
 docs/shapes.png pot shape sheet (pots-gallery --shapes size=big)
 docs/clip.png   the wall clip (pots clip.enable=true)
+docs/clip_drawing.png  its dimensioned drawing (the same run)
 ```
 
 ### How the mesh is made

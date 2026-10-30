@@ -34,6 +34,9 @@ Outputs (in `out`, default output/<pattern>_<shape>_h<height>/):
                            with clip.enable: the wall clip, a separate
                            part, lying in its print orientation (+ a preview
                            of it holding the pot)
+    <pattern>_<shape>_h<height>_clip_drawing.png
+                           with clip.enable: its dimensioned drawing, each
+                           size labelled with its clip.* setting
     config.yaml            the exact settings used
 """
 import logging
@@ -130,7 +133,7 @@ def run(cfg):
 
     from .metrics import overhang_share, wall_metrics
     from .pipeline import generate
-    from .preview import render, render_clip
+    from .preview import render, render_clip, render_clip_drawing
 
     try:
         pot = pot_from_config(cfg)
@@ -180,6 +183,9 @@ def run(cfg):
         if clip is not None:
             path = out / f"{name}_clip.png"
             render_clip(m, clip, path, f"wall clip for {cfg.pattern}, {cfg.shape}  (H {pot.height:g} mm)")
+            outs.append(path)
+            path = out / f"{name}_clip_drawing.png"
+            render_clip_drawing(clip, path)
             outs.append(path)
     else:
         log.info("[3/3] skipped preview")

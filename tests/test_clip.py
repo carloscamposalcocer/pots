@@ -121,3 +121,11 @@ def test_clip_config():
     clip = clip_from_config(cfg, pot_from_config(cfg))
     assert clip.width == 18 and clip.pot.height == 50
     assert set(cfg.clip) - {"enable"} == set(Clip.__dataclass_fields__) - {"pot"}
+
+
+def test_clip_drawing(tmp_path):
+    """The dimensioned drawing renders (2D slices only, no mesh rendering)."""
+    from pots.preview import render_clip_drawing
+    path = tmp_path / "drawing.png"
+    render_clip_drawing(Clip(pot_for(100, "tapered")), path)
+    assert path.stat().st_size > 10_000

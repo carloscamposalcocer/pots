@@ -303,6 +303,158 @@ def render_clip(mesh, clip, path, title):
     log.info("clip preview saved %s in %.1f s", path, time.perf_counter() - t0)
 
 
+def _fill(ax, rings, colour, **kw):
+    """Polygons (outer rings counter-clockwise, holes clockwise) as one patch."""
+    from matplotlib.patches import PathPatch
+    from matplotlib.path import Path as MPath
+    rings = [np.asarray(r) for r in rings]
+    if not rings:
+        return
+    verts = np.vstack([np.vstack([r, r[:1]]) for r in rings])
+    codes = np.concatenate([[MPath.MOVETO] + [MPath.LINETO] * (len(r) - 1) + [MPath.CLOSEPOLY]
+                            for r in rings])
+    ax.add_patch(PathPatch(MPath(verts, codes), facecolor=colour, edgecolor=INK, lw=0.6, **kw))
+
+
+def _dim(ax, a, b, text, off, outside=False, size=10):
+    """A dimension from point a to point b, drawn `off` (dx, dz) away from
+    them with extension lines. outside=True for short ones: the arrows
+    point in from beyond the ends."""
+    a, b, off = np.asarray(a, float), np.asarray(b, float), np.asarray(off, float)
+    pa, pb = a + off, b + off
+    line = dict(color=INK, lw=0.6)
+    for p, q in ((a, pa), (b, pb)):
+        n = np.linalg.norm(q - p)
+        if n > 1e-9:
+            ax.plot(*np.c_[p, q + (q - p) / n * 0.6], **line)
+    d = pb - pa
+    L = np.linalg.norm(d)
+    u = d / L if L > 1e-9 else np.array([1.0, 0.0])
+    arrow = dict(arrowstyle="-|>", color=INK, lw=0.6, mutation_scale=8, shrinkA=0, shrinkB=0)
+    if outside:
+        ax.annotate("", pa, pa - 2.5 * u, arrowprops=arrow)
+        ax.annotate("", pb, pb + 2.5 * u, arrowprops=arrow)
+        ax.plot(*np.c_[pa - 2.5 * u, pb + 2.5 * u], **line)
+    else:
+        ax.annotate("", pa, pb, arrowprops=dict(arrow, arrowstyle="<|-|>"))
+    vertical = abs(u[1]) > abs(u[0])
+    side = off / (np.linalg.norm(off) or 1)
+    mid = (pa + pb) / 2 + side * 0.8
+    if outside:
+        mid = pb + u * 3.2 if vertical else mid
+    ha = "left" if side[0] > 0.5 else "right" if side[0] < -0.5 else "center"
+    va = "bottom" if side[1] > 0.5 else "top" if side[1] < -0.5 else "center"
+    if outside and vertical:
+        ha, va = ("left" if side[0] >= 0 else "right"), ("bottom" if u[1] > 0 else "top")
+    ax.text(*mid, text, ha=ha, va=va, fontsize=size, color=INK, family="monospace",
+            bbox=dict(fc="white", ec="none", pad=0.6, alpha=0.85))
+
+
+def _note(ax, at, xy, text, size=10):
+    """A leader from text at `xy` to the point `at`."""
+    ax.annotate(text, at, xy, fontsize=size, color=INK, family="monospace", ha="center", va="center",
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=0.6, mutation_scale=8, shrinkA=2, shrinkB=0),
+                bbox=dict(fc="white", ec="none", pad=0.6, alpha=0.85))
+
+
+def render_clip_drawing(clip, path):
+    """Technical drawing of the wall clip, every dimension named after its
+    `clip.*` setting: the section on its centre line with the pot behind it,
+    a detail of the rim in its slot, and the plate seen from the pot. Drawn
+    straight from the geometry (2D slices of the clip, the plain pot's
+    profile), no rendering, about a second."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from .clip import FLOOR, STEP
+    from .solid import _profile
+
+    t0 = time.perf_counter()
+    p, c = clip.pot, clip
+    v = lambda name: f"{name} = {getattr(c, name):g}"
+    m = c.manifold()
+    section = m.rotate([-90, 0, 0]).slice(0.0).to_polygons()       # (x, z) on the centre line
+    def front(x):                                                    # (y, z) at depth x
+        return [np.c_[r[:, 1], -r[:, 0]] for r in m.rotate([0, -90, 0]).slice(x).to_polygons()]
+    pot = _profile(p).to_polygons()
+    H, w, f = p.height, c.x_wall, c.face
+    rim_in, rim_out = float(p.r_in(H)), float(p.r_out(H))
+    lip = H + c.lift                                                 # the slot's roof over the rim
+    base_out = float(c.env(0.0))
+
+    fig = plt.figure(figsize=(18, 10.5), facecolor="white")
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.0, 1.55, 0.75], wspace=0.08)
+
+    def frame(ax, title, x0, x1, z0, z1):
+        ax.set_xlim(x0, x1); ax.set_ylim(z0, z1); ax.set_aspect("equal")
+        ax.tick_params(colors=MUTED, labelsize=8)
+        ax.grid(color="#eee", lw=0.5); ax.set_axisbelow(True)
+        style(ax, title, fontsize=12)
+
+    def side(ax):
+        _fill(ax, pot, "#ecc9b6")
+        _fill(ax, section, "#c9d3db")
+        ax.axvline(w, color=WALL_HEX, lw=5)
+
+    # ---- the whole section
+    ax = fig.add_subplot(gs[0])
+    side(ax)
+    x0 = base_out - c.ledge - 12
+    frame(ax, "Section on the centre line", x0, w + 14, c.bottom - 9, c.top + 5)
+    _dim(ax, (base_out - c.ledge, c.bottom), (base_out, c.bottom), v("ledge"), (0, -3))
+    _dim(ax, (base_out - c.ledge, c.bottom), (base_out - c.ledge, 0), v("thick"), (-2.5, 0), outside=True)
+    z = c.screw_hi
+    _dim(ax, (w, z - c.sink / 2), (w, z + c.sink / 2), v("head"), (3, 0))
+    z = c.screw_lo
+    _dim(ax, (w, z - c.bore / 2), (w, z + c.bore / 2), v("screw"), (3, 0), outside=True)
+    _note(ax, (f + (c.head_h + c.clear) / 2, z + c.sink / 2 - 1), (f - 9, z + c.sink / 2 + 7),
+          f"{v('head_h')} + clear:\ncounterbore depth", size=9)
+    _dim(ax, (f, c.bottom), (w, c.bottom), f"head_h + clear + {FLOOR:g}", (0, -6.5), outside=True, size=9)
+    ax.text(w + 1.5, c.top, "wall", rotation=90, color=MUTED, va="top")
+    ax.text(x0 + 2, H / 2, "pot", color="#b07050", fontsize=11)
+    ax.text(x0 + 2, H / 2 - 5, f"height = {H:g}", color=MUTED, fontsize=9, family="monospace")
+
+    # ---- detail: the rim in its slot
+    ax = fig.add_subplot(gs[1])
+    side(ax)
+    u0, u1 = c.finger - c.thick - 9, w + 3
+    z0, z1 = c.tip - 4, c.top + 4
+    frame(ax, "Detail: the rim in its slot", u0, u1, z0, z1)
+    _dim(ax, (c.finger, lip), (c.finger, c.tip), v("drop"), (-(c.thick + 1.5), 0))
+    _dim(ax, (c.finger - c.thick, c.tip), (c.finger, c.tip), v("thick"), (0, -1.5))
+    _dim(ax, (rim_out + c.clear, c.under), (rim_out + c.clear, lip), v("groove"), (2.5, 0),
+         outside=c.groove < 3)
+    _dim(ax, (f, lip), (f, c.top), f"thick - {STEP:g}", (2.0, 0), outside=True, size=9)
+    zc = H - c.drop / 2
+    _note(ax, (c.finger + c.clear / 2, zc), (c.finger + (rim_in - c.finger) / 2 + 4.5, zc + 2.2),
+          f"{v('clear')}\n(every face)", size=9)
+    _note(ax, ((rim_in + rim_out) / 2, lip), ((rim_in + rim_out) / 2 - 3.5, c.top + 2.2),
+          v("lift") + ("  (rim on the roof)" if c.lift == 0 else ""), size=9)
+    ax.text((rim_in + rim_out) / 2, H - c.drop - 2.5, "pot rim", ha="center", color="#b07050", fontsize=10)
+
+    # ---- the plate, seen from the pot
+    ax = fig.add_subplot(gs[2])
+    _fill(ax, front(w - FLOOR / 2), "#c9d3db")                       # behind the heads: the shank holes
+    for r in front(f + (c.head_h + c.clear) / 2):                    # the counterbores, as outlines
+        x, y = r[:, 0], r[:, 1]
+        if np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)) > 0:
+            continue                                                 # the outline, not a hole
+        r = np.vstack([r, r[:1]])
+        ax.plot(r[:, 0], r[:, 1], color=INK, lw=0.6, ls=(0, (3, 2)))
+    W = c.width
+    frame(ax, "Plate, seen from the pot", -W / 2 - 9, W / 2 + 9, c.bottom - 9, c.top + 5)
+    _dim(ax, (-W / 2, c.bottom), (W / 2, c.bottom), v("width"), (0, -3))
+    for z in (c.screw_lo, c.screw_hi):
+        ax.plot([-W / 2 - 1.5, W / 2 + 1.5], [z, z], color=MUTED, lw=0.5, ls="-.")
+    ax.text(0, c.top + 1.2, "dashed: counterbores", ha="center", fontsize=8, color=MUTED)
+
+    fig.suptitle(f"Wall clip for the {p.shape} pot, H {H:g} mm  (mm; labels are the clip.* settings)\n{c}",
+                 fontsize=13, color=INK)
+    plt.savefig(path, dpi=90, bbox_inches="tight"); plt.close(fig)
+    log.info("clip drawing saved %s in %.1f s", path, time.perf_counter() - t0)
+
+
 def render_card(mesh, field, pot, path, title):
     """Small gallery image: outside view + a 40 x 30 mm true-scale swatch of the outer face."""
     import matplotlib
